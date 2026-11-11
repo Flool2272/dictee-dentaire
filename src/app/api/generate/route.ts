@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { AnalyseSchema } from "@/lib/schema";
-import { ANALYSE_DEMO } from "@/lib/demo";
+import { casPourDictee } from "@/lib/demo";
 import { grillePourPrompt } from "@/lib/tarifs";
 
 const SYSTEM = `Tu assistes une chirurgienne-dentiste française. Elle te transmet la transcription d'une dictée faite pendant ou après une séance.
@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     // Mode démo : pas de clé configurée, on renvoie une analyse fictive.
-    return NextResponse.json({ ...ANALYSE_DEMO, demo: true });
+    const { cas, exact } = casPourDictee(dictee);
+    return NextResponse.json({ ...cas.analyse, demo: exact ? "exact" : "approx" });
   }
 
   const client = new Anthropic();

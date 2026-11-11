@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Dictaphone from "@/components/Dictaphone";
 import type { ActeExtrait, Analyse } from "@/lib/schema";
 import { TARIFS } from "@/lib/tarifs";
+import { CAS_DEMO } from "@/lib/demo";
 import { calculerLignes, euros, totaliser, type LigneDevis } from "@/lib/devis";
 
 type Cabinet = { praticien: string; adresse: string; telephone: string; rpps: string };
@@ -20,15 +21,6 @@ const RUBRIQUES: { cle: keyof Analyse["compteRendu"]; titre: string }[] = [
   { cle: "planTraitement", titre: "Plan de traitement" },
   { cle: "conseils", titre: "Conseils au patient" },
 ];
-
-const EXEMPLE =
-  "Patient de 42 ans venu pour une douleur au froid en bas à gauche depuis une semaine. Pas d'antécédent particulier, " +
-  "pas d'allergie connue. À l'examen, carie occluso-distale sur la 36, test au froid positif mais douleur brève, pas de " +
-  "douleur à la percussion. Rétro-alvéolaire sur la 36 : carie proche de la pulpe sans atteinte. Tartre important au bloc " +
-  "incisivo-canin mandibulaire. Aujourd'hui j'ai fait le détartrage complet et un composite deux faces sur la 36. " +
-  "La 46 est très délabrée, déjà dévitalisée, il faudra faire un inlay-core et une couronne céramo-céramique. " +
-  "Je propose aussi une couronne zircone sur la 25 qui est fracturée. Conseils : brossage trois fois par jour, " +
-  "brossettes interdentaires, revoir dans quinze jours.";
 
 function lireCabinet(): Cabinet {
   try {
@@ -52,7 +44,7 @@ export default function Accueil() {
   const [onglet, setOnglet] = useState<"cr" | "devis">("cr");
   const [aImprimer, setAImprimer] = useState<"cr" | "devis">("cr");
   const [copie, setCopie] = useState(false);
-  const [demo, setDemo] = useState(false);
+  const [demo, setDemo] = useState<"exact" | "approx" | null>(null);
 
   useEffect(() => {
     // Lecture différée : localStorage n'existe pas pendant le rendu serveur.
@@ -84,7 +76,7 @@ export default function Accueil() {
         return;
       }
       const { demo: estDemo, ...resultat } = data;
-      setDemo(Boolean(estDemo));
+      setDemo(estDemo === "exact" || estDemo === "approx" ? estDemo : null);
       setAnalyse(resultat as Analyse);
       setOnglet("cr");
     } finally {
@@ -213,9 +205,21 @@ export default function Accueil() {
 
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <Dictaphone onTranscription={(t) => setDictee((d) => (d ? `${d}\n${t}` : t))} />
-            <button onClick={() => setDictee(EXEMPLE)} className="text-sm text-teal-700 underline-offset-2 hover:underline">
-              Charger une dictée d&apos;exemple
-            </button>
+            <select
+              value=""
+              onChange={(e) => {
+                const cas = CAS_DEMO.find((c) => c.id === e.target.value);
+                if (cas) setDictee(cas.dictee);
+              }}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-teal-800"
+            >
+              <option value="">Charger une dictée d&apos;exemple…</option>
+              {CAS_DEMO.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.titre}
+                </option>
+              ))}
+            </select>
           </div>
           <textarea
             value={dictee}
@@ -274,9 +278,11 @@ export default function Accueil() {
 
             {demo && (
               <div className="mb-5 rounded-lg bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200">
-                <strong>Mode démo :</strong> aucune clé d&apos;IA n&apos;est configurée. Ce résultat est fictif et
-                correspond à la dictée d&apos;exemple, quel que soit le texte saisi. Le calcul du devis, les modifications
-                et les PDF fonctionnent normalement.
+                <strong>Mode démo :</strong> aucune clé d&apos;IA n&apos;est configurée, ce résultat est fictif.{" "}
+                {demo === "exact"
+                  ? "Il correspond à la dictée d'exemple choisie."
+                  : "Le texte saisi ne correspond à aucun exemple : le premier cas fictif est affiché à la place."}{" "}
+                Le calcul du devis, les modifications et les PDF fonctionnent normalement.
               </div>
             )}
 

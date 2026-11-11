@@ -37,7 +37,13 @@ export const TARIFS: Acte[] = [
   { code: "HBLD634", libelle: "Couronne céramo-métallique (incisive, canine, 1re prémolaire)", honoraires: 500, baseRemboursement: 120, tauxAMO: 0.6, panier: "100% santé", parDent: true },
   { code: "HBLD680", libelle: "Couronne zircone monolithe (prémolaire)", honoraires: 440, baseRemboursement: 120, tauxAMO: 0.6, panier: "modéré", parDent: true },
   { code: "HBLD073", libelle: "Couronne céramo-céramique (molaire)", honoraires: 750, baseRemboursement: 120, tauxAMO: 0.6, panier: "libre", parDent: true },
+  { code: "HBBD005", libelle: "Scellement prophylactique des sillons", honoraires: 21.69, baseRemboursement: 21.69, tauxAMO: 0.6, panier: "soins", parDent: true },
+  { code: "HBMD020", libelle: "Restauration d'une dent temporaire", honoraires: 30, baseRemboursement: 30, tauxAMO: 0.6, panier: "soins", parDent: true },
+  { code: "HBLD131", libelle: "Bridge céramo-métallique 3 éléments", honoraires: 1300, baseRemboursement: 279.5, tauxAMO: 0.6, panier: "modéré", parDent: false },
+  { code: "HBLD418", libelle: "Couronne sur implant céramo-métallique", honoraires: 900, baseRemboursement: 107.5, tauxAMO: 0.6, panier: "libre", parDent: true },
   { code: "HN-IMPL", libelle: "Pose d'un implant (hors nomenclature)", honoraires: 1100, baseRemboursement: 0, tauxAMO: 0, panier: "hors nomenclature", parDent: true },
+  { code: "HN-SURF", libelle: "Surfaçage radiculaire, par sextant (non remboursé)", honoraires: 80, baseRemboursement: 0, tauxAMO: 0, panier: "hors nomenclature", parDent: false },
+  { code: "HN-GOUT", libelle: "Gouttière occlusale de bruxisme (non remboursée)", honoraires: 280, baseRemboursement: 0, tauxAMO: 0, panier: "hors nomenclature", parDent: false },
   { code: "HN-BLAN", libelle: "Éclaircissement dentaire (hors nomenclature)", honoraires: 350, baseRemboursement: 0, tauxAMO: 0, panier: "hors nomenclature", parDent: false },
 ];
 
