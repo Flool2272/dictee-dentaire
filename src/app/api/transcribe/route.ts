@@ -7,18 +7,20 @@ const VOCABULAIRE =
   "vestibulaire, lingual, parodontite, implant, bridge, dent 36, dent 21.";
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Mode démo : la dictée vocale n'est pas encore activée. Tapez le texte ou chargez l'exemple." },
-      { status: 503 }
-    );
-  }
-
   const form = await request.formData().catch(() => null);
   const audio = form?.get("audio");
   if (!(audio instanceof Blob) || audio.size === 0) {
     return NextResponse.json({ error: "Aucun enregistrement reçu" }, { status: 400 });
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    // Mode démo : on confirme que l'enregistrement est bien arrivé, sans le transcrire.
+    const ko = Math.round(audio.size / 1024);
+    return NextResponse.json({
+      texte: `[Démo : enregistrement bien reçu (${ko} Ko). Le texte dicté s'affichera ici une fois la clé OpenAI ajoutée.]`,
+      demo: true,
+    });
   }
 
   const body = new FormData();
