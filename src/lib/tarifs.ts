@@ -1,7 +1,7 @@
-// GRILLE TARIFAIRE SIMULÉE
-// Les codes, libellés et montants ci-dessous sont indicatifs et servent uniquement
-// à faire fonctionner le prototype. Ils doivent être remplacés par la grille réelle
-// du cabinet (codes CCAM, honoraires pratiqués, bases de remboursement à jour).
+// GRILLE TARIFAIRE
+// Les actes marqués « devis du cabinet » reprennent les codes et montants d'un devis
+// réel fourni par le cabinet. Les autres sont simulés : codes, libellés et montants
+// indicatifs, à remplacer par la grille réelle (codes CCAM, honoraires, bases à jour).
 
 export type Panier = "soins" | "100% santé" | "modéré" | "libre" | "hors nomenclature";
 
@@ -17,9 +17,28 @@ export type Acte = {
   panier: Panier;
   /** true si l'acte est facturé par dent (le nombre de dents donne la quantité) */
   parDent: boolean;
+  /** Honoraires limite de facturation (plafond), pour les actes concernés */
+  limite?: number;
+  /** Code matériau tel qu'il figure sur le devis conventionnel */
+  materiau?: string;
 };
 
+/** Numéro de panier sur le devis conventionnel : 1 = 100 % santé, 2 = modéré, 3 = libre. */
+export function numeroPanier(panier: Panier): string {
+  return panier === "100% santé" ? "1" : panier === "modéré" ? "2" : panier === "libre" ? "3" : "";
+}
+
 export const TARIFS: Acte[] = [
+  // Devis du cabinet
+  { code: "HBGD027", libelle: "Découpe / descellement de couronne postérieure", honoraires: 38, baseRemboursement: 0, tauxAMO: 0, panier: "hors nomenclature", parDent: true },
+  { code: "HBGD001", libelle: "Désobturation canalaire d'une prémolaire", honoraires: 75, baseRemboursement: 0, tauxAMO: 0, panier: "hors nomenclature", parDent: true },
+  { code: "HBMD042", libelle: "Obturation 5 faces avec ancrage radiculaire", honoraires: 104, baseRemboursement: 104, tauxAMO: 0.6, panier: "soins", parDent: true },
+  { code: "HBFD003", libelle: "Mise en forme et obturation canalaire d'une prémolaire", honoraires: 70.72, baseRemboursement: 70.72, tauxAMO: 0.6, panier: "soins", parDent: true },
+  { code: "HBQK040", libelle: "Radiographies rétro-alvéolaires per-interventionnelle et finale", honoraires: 11.97, baseRemboursement: 11.97, tauxAMO: 0.6, panier: "soins", parDent: false },
+  { code: "HBLD490", libelle: "Couronne transitoire", honoraires: 61.8, baseRemboursement: 10, tauxAMO: 0.6, panier: "100% santé", parDent: true, limite: 61.8, materiau: "4" },
+  { code: "HBLD350", libelle: "Couronne définitive zircone monolithique", honoraires: 453.2, baseRemboursement: 120, tauxAMO: 0.6, panier: "100% santé", parDent: true, limite: 453.2, materiau: "3" },
+  { code: "HBJA247", libelle: "Assainissement parodontal par lambeau", honoraires: 50, baseRemboursement: 0, tauxAMO: 0, panier: "hors nomenclature", parDent: false },
+  // Actes simulés
   { code: "C", libelle: "Consultation", honoraires: 30, baseRemboursement: 30, tauxAMO: 0.6, panier: "soins", parDent: false },
   { code: "HBJD001", libelle: "Détartrage et polissage des dents", honoraires: 43.38, baseRemboursement: 43.38, tauxAMO: 0.6, panier: "soins", parDent: false },
   { code: "HBQK002", libelle: "Radiographie rétro-alvéolaire (1 à 3 dents contiguës)", honoraires: 15, baseRemboursement: 15, tauxAMO: 0.6, panier: "soins", parDent: false },
@@ -32,7 +51,6 @@ export const TARIFS: Acte[] = [
   { code: "HBFD035", libelle: "Traitement endodontique d'une molaire", honoraires: 120, baseRemboursement: 120, tauxAMO: 0.6, panier: "soins", parDent: true },
   { code: "HBGD036", libelle: "Avulsion d'une dent permanente", honoraires: 33.44, baseRemboursement: 33.44, tauxAMO: 0.6, panier: "soins", parDent: true },
   { code: "HBGD021", libelle: "Avulsion d'une dent de sagesse incluse", honoraires: 150, baseRemboursement: 83.6, tauxAMO: 0.6, panier: "libre", parDent: true },
-  { code: "HBLD490", libelle: "Couronne provisoire", honoraires: 60, baseRemboursement: 10, tauxAMO: 0.6, panier: "100% santé", parDent: true },
   { code: "HBLD090", libelle: "Inlay-core", honoraires: 175, baseRemboursement: 90, tauxAMO: 0.6, panier: "100% santé", parDent: true },
   { code: "HBLD634", libelle: "Couronne céramo-métallique (incisive, canine, 1re prémolaire)", honoraires: 500, baseRemboursement: 120, tauxAMO: 0.6, panier: "100% santé", parDent: true },
   { code: "HBLD680", libelle: "Couronne zircone monolithe (prémolaire)", honoraires: 440, baseRemboursement: 120, tauxAMO: 0.6, panier: "modéré", parDent: true },

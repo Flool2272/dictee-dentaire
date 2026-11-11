@@ -2,6 +2,10 @@ import { z } from "zod";
 import { CODES } from "./tarifs";
 
 export const ActeExtraitSchema = z.object({
+  etape: z
+    .number()
+    .int()
+    .describe("Numéro d'étape du traitement : 1 pour la première étape, 2 pour la suivante, etc. Les actes d'une même séance partagent le même numéro."),
   code: z.enum(CODES).describe("Code de l'acte, choisi uniquement dans la grille fournie"),
   dents: z
     .array(z.string())

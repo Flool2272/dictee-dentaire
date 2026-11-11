@@ -11,7 +11,8 @@ Ta tâche :
 1. Rédiger un compte rendu clinique clair, en français médical sobre, à partir de la dictée uniquement. N'invente aucune donnée clinique. Si une rubrique n'est pas abordée, écris "Non renseigné".
 2. Lister les actes cités, en choisissant leur code UNIQUEMENT dans la grille ci-dessous. Distingue les actes réalisés pendant la séance des actes proposés dans le plan de traitement.
 3. Mettre dans "actesNonReconnus" tout acte dicté qui n'a pas d'équivalent dans la grille, au lieu de forcer un code.
-4. Signaler dans "pointsAVerifier" toute ambiguïté : numéro de dent incertain, nombre de faces non précisé, matériau de couronne non précisé, etc.
+4. Numéroter les étapes du traitement ("etape") dans l'ordre où elles seront réalisées, en regroupant les actes d'une même séance.
+5. Signaler dans "pointsAVerifier" toute ambiguïté : numéro de dent incertain, nombre de faces non précisé, matériau de couronne non précisé, etc.
 
 Numérotation des dents : notation FDI à deux chiffres (11 à 48, 51 à 85 pour les dents temporaires). Convertis les formulations orales ("la six du bas à gauche" = 36).
 Ne mentionne jamais l'identité du patient, même si elle apparaît dans la dictée.

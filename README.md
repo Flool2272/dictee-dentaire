@@ -19,7 +19,7 @@ l'interface, le devis et les PDF. Sans `OPENAI_API_KEY`, la dictée vocale est d
 
 ## Grille tarifaire
 
-`src/lib/tarifs.ts` contient une grille **simulée**. Elle doit être remplacée par les codes CCAM, honoraires
+`src/lib/tarifs.ts` contient huit actes repris d'un devis réel du cabinet ; les autres sont **simulés** et doivent être remplacés par les codes CCAM, honoraires
 et bases de remboursement réels du cabinet avant tout usage.
 
 ## Données de santé

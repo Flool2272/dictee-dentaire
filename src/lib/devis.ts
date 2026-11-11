@@ -2,6 +2,7 @@ import type { ActeExtrait } from "./schema";
 import { trouverActe, type Acte } from "./tarifs";
 
 export type LigneDevis = {
+  etape: number;
   acte: Acte;
   dents: string[];
   quantite: number;
@@ -32,6 +33,7 @@ export function calculerLignes(actes: ActeExtrait[]): LigneDevis[] {
     const baseRemboursement = arrondi(acte.baseRemboursement * quantite);
     const remboursementAMO = arrondi(baseRemboursement * acte.tauxAMO);
     lignes.push({
+      etape: a.etape,
       acte,
       dents: a.dents,
       quantite,

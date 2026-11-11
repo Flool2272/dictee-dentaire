@@ -13,6 +13,13 @@
     size: A4;
     margin: 16mm;
   }
+  @page devis {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+  .page-devis {
+    page: devis;
+  }
   .no-print {
     display: none !important;
   }

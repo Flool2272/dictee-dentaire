@@ -32,12 +32,12 @@ export const CAS_DEMO: CasDemo[] = [
         conseils: "Brossage trois fois par jour, brossettes interdentaires. Contrôle dans quinze jours.",
       },
       actes: [
-        { code: "HBQK002", dents: ["36"], quantite: 1, statut: "realise", precision: "" },
-        { code: "HBJD001", dents: [], quantite: 1, statut: "realise", precision: "" },
-        { code: "HBMD038", dents: ["36"], quantite: 1, statut: "realise", precision: "Faces occlusale et distale" },
-        { code: "HBLD090", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
-        { code: "HBLD073", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
-        { code: "HBLD680", dents: ["25"], quantite: 1, statut: "propose", precision: "Dent fracturée" },
+        { etape: 1, code: "HBQK002", dents: ["36"], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HBJD001", dents: [], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HBMD038", dents: ["36"], quantite: 1, statut: "realise", precision: "Faces occlusale et distale" },
+        { etape: 1, code: "HBLD090", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 2, code: "HBLD073", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 3, code: "HBLD680", dents: ["25"], quantite: 1, statut: "propose", precision: "Dent fracturée" },
       ],
       actesNonReconnus: [],
       pointsAVerifier: ["Matériau de l'inlay-core de la 46 non précisé."],
@@ -68,9 +68,9 @@ export const CAS_DEMO: CasDemo[] = [
         conseils: "Bains de bouche selon prescription. Consulter en cas de fièvre ou d'aggravation du gonflement.",
       },
       actes: [
-        { code: "C", dents: [], quantite: 1, statut: "realise", precision: "" },
-        { code: "HBQK001", dents: [], quantite: 1, statut: "realise", precision: "" },
-        { code: "HBGD021", dents: ["38", "48"], quantite: 1, statut: "propose", precision: "En une séance, anesthésie locale" },
+        { etape: 1, code: "C", dents: [], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HBQK001", dents: [], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HBGD021", dents: ["38", "48"], quantite: 1, statut: "propose", precision: "En une séance, anesthésie locale" },
       ],
       actesNonReconnus: ["Scanner (cone beam) préopératoire de la 48"],
       pointsAVerifier: [
@@ -101,9 +101,9 @@ export const CAS_DEMO: CasDemo[] = [
         conseils: "Brossage deux fois par jour avec un dentifrice fluoré adapté à l'âge. Limiter le grignotage.",
       },
       actes: [
-        { code: "C", dents: [], quantite: 1, statut: "realise", precision: "" },
-        { code: "HBBD005", dents: ["16", "26", "36", "46"], quantite: 1, statut: "realise", precision: "" },
-        { code: "HBMD020", dents: ["75"], quantite: 1, statut: "realise", precision: "Une face" },
+        { etape: 1, code: "C", dents: [], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HBBD005", dents: ["16", "26", "36", "46"], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HBMD020", dents: ["75"], quantite: 1, statut: "realise", precision: "Une face" },
       ],
       actesNonReconnus: [],
       pointsAVerifier: [
@@ -135,18 +135,56 @@ export const CAS_DEMO: CasDemo[] = [
         conseils: "Arrêt ou réduction du tabac recommandé. Hygiène interdentaire quotidienne.",
       },
       actes: [
-        { code: "C", dents: [], quantite: 1, statut: "realise", precision: "" },
-        { code: "HBQK001", dents: [], quantite: 1, statut: "realise", precision: "" },
-        { code: "HN-SURF", dents: [], quantite: 2, statut: "propose", precision: "Secteurs 1 et 4" },
-        { code: "HN-IMPL", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
-        { code: "HBLD418", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
-        { code: "HN-GOUT", dents: [], quantite: 1, statut: "propose", precision: "" },
+        { etape: 1, code: "C", dents: [], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HBQK001", dents: [], quantite: 1, statut: "realise", precision: "" },
+        { etape: 1, code: "HN-SURF", dents: [], quantite: 2, statut: "propose", precision: "Secteurs 1 et 4" },
+        { etape: 2, code: "HN-IMPL", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 3, code: "HBLD418", dents: ["46"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 4, code: "HN-GOUT", dents: [], quantite: 1, statut: "propose", precision: "" },
       ],
       actesNonReconnus: ["Scanner (cone beam) pré-implantaire, si nécessaire"],
       pointsAVerifier: [
         "Nombre exact de sextants à surfacer (deux d'après la dictée).",
         "Dernier bilan HbA1c non mentionné (diabète).",
       ],
+    },
+  },
+  {
+    id: "reprise-couronne-25",
+    titre: "Reprise de couronne sur la 25",
+    dictee:
+      "Patiente de 48 ans, la couronne de la 25 est descellée et elle a une gêne à la mastication. Pas d'antécédent " +
+      "médical, pas d'allergie. La 25 est dévitalisée, la radio montre un traitement canalaire incomplet avec une image " +
+      "périapicale. Inflammation gingivale localisée avec poche en distal de la 25. Je propose : découpe et descellement " +
+      "de la couronne, désobturation canalaire puis reprise du traitement canalaire avec radios per-opératoire et finale, " +
+      "reconstitution avec ancrage radiculaire, couronne transitoire, puis couronne zircone monolithique. " +
+      "Et un assainissement parodontal par lambeau autour de la 25. Elle signe le devis aujourd'hui.",
+    analyse: {
+      compteRendu: {
+        motif: "Descellement de la couronne de la 25, gêne à la mastication.",
+        antecedents: "Aucun antécédent médical. Pas d'allergie connue.",
+        examenClinique: "25 dépulpée, couronne descellée. Inflammation gingivale localisée avec poche en distal de la 25.",
+        examensComplementaires: "Radiographie : traitement canalaire incomplet de la 25 avec image périapicale.",
+        diagnostic: "Lésion périapicale sur 25 avec traitement endodontique insuffisant. Atteinte parodontale localisée.",
+        soinsRealises: "Examen et radiographie. Présentation et signature du devis.",
+        planTraitement:
+          "1. Dépose de la couronne de la 25. 2. Retraitement endodontique de la 25 avec radiographies per-opératoire et finale. " +
+          "3. Reconstitution avec ancrage radiculaire. 4. Couronne transitoire puis couronne zircone monolithique. " +
+          "5. Assainissement parodontal par lambeau en regard de la 25.",
+        conseils: "Éviter de mastiquer côté gauche jusqu'à la couronne transitoire. Hygiène interdentaire soigneuse.",
+      },
+      actes: [
+        { etape: 1, code: "HBGD027", dents: ["25"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 2, code: "HBGD001", dents: ["25"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 2, code: "HBFD003", dents: ["25"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 2, code: "HBQK040", dents: ["25"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 3, code: "HBMD042", dents: ["25"], quantite: 1, statut: "propose", precision: "Mésio-occluso-vestibulo-palatino-distale" },
+        { etape: 4, code: "HBLD490", dents: ["25"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 4, code: "HBLD350", dents: ["25"], quantite: 1, statut: "propose", precision: "" },
+        { etape: 5, code: "HBJA247", dents: ["25"], quantite: 1, statut: "propose", precision: "" },
+      ],
+      actesNonReconnus: [],
+      pointsAVerifier: [],
     },
   },
 ];

@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Dictaphone from "@/components/Dictaphone";
 import type { ActeExtrait, Analyse } from "@/lib/schema";
-import { TARIFS } from "@/lib/tarifs";
+import { TARIFS, numeroPanier } from "@/lib/tarifs";
 import { CAS_DEMO } from "@/lib/demo";
 import { calculerLignes, euros, totaliser, type LigneDevis } from "@/lib/devis";
 
-type Cabinet = { praticien: string; adresse: string; telephone: string; rpps: string };
-const CABINET_VIDE: Cabinet = { praticien: "", adresse: "", telephone: "", rpps: "" };
+type Cabinet = { praticien: string; adresse: string; telephone: string; rpps: string; finess: string };
+const CABINET_VIDE: Cabinet = { praticien: "", adresse: "", telephone: "", rpps: "", finess: "" };
+
+// Identité du patient : saisie et imprimée localement, jamais envoyée à l'IA ni stockée.
+type Patient = { nom: string; naissance: string; secu: string };
 
 const RUBRIQUES: { cle: keyof Analyse["compteRendu"]; titre: string }[] = [
   { cle: "motif", titre: "Motif de consultation" },
@@ -35,7 +38,8 @@ export default function Accueil() {
   const router = useRouter();
   const [cabinet, setCabinet] = useState<Cabinet>(CABINET_VIDE);
   const [reglagesOuverts, setReglagesOuverts] = useState(false);
-  const [patient, setPatient] = useState("");
+  const [patient, setPatient] = useState<Patient>({ nom: "", naissance: "", secu: "" });
+  const [numeroDevis, setNumeroDevis] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dictee, setDictee] = useState("");
   const [analyse, setAnalyse] = useState<Analyse | null>(null);
@@ -78,6 +82,7 @@ export default function Accueil() {
       const { demo: estDemo, ...resultat } = data;
       setDemo(estDemo === "exact" || estDemo === "approx" ? estDemo : null);
       setAnalyse(resultat as Analyse);
+      setNumeroDevis(`${date.replaceAll("-", "")}-${Math.floor(1000 + Math.random() * 9000)}`);
       setOnglet("cr");
     } finally {
       setChargement(false);
@@ -89,7 +94,8 @@ export default function Accueil() {
     [analyse]
   );
   const proposes = useMemo(
-    () => calculerLignes(analyse?.actes.filter((a) => a.statut === "propose") ?? []),
+    () =>
+      calculerLignes(analyse?.actes.filter((a) => a.statut === "propose") ?? []).sort((a, b) => a.etape - b.etape),
     [analyse]
   );
 
@@ -111,7 +117,8 @@ export default function Accueil() {
 
   function ajouterActe() {
     if (!analyse) return;
-    const nouvel: ActeExtrait = { code: TARIFS[0].code, dents: [], quantite: 1, statut: "propose", precision: "" };
+    const derniereEtape = Math.max(0, ...analyse.actes.map((a) => a.etape));
+    const nouvel: ActeExtrait = { etape: derniereEtape || 1, code: TARIFS[0].code, dents: [], quantite: 1, statut: "propose", precision: "" };
     setAnalyse({ ...analyse, actes: [...analyse.actes, nouvel] });
   }
 
@@ -163,9 +170,9 @@ export default function Accueil() {
         </header>
 
         <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong>Prototype.</strong> La grille tarifaire est simulée : codes et montants à remplacer par ceux du cabinet.
-          Ne dictez pas le nom du patient. Saisissez-le dans le champ prévu : il reste dans le navigateur et n&apos;est pas
-          envoyé à l&apos;IA.
+          <strong>Prototype.</strong> La grille tarifaire est en partie simulée : seuls les actes repris du devis du cabinet
+          ont des montants réels. Ne dictez pas l&apos;identité du patient : saisissez-la dans les champs prévus, elle reste
+          dans le navigateur et n&apos;est pas envoyée à l&apos;IA.
         </div>
 
         {reglagesOuverts && (
@@ -177,6 +184,7 @@ export default function Accueil() {
                 ["adresse", "Adresse du cabinet"],
                 ["telephone", "Téléphone"],
                 ["rpps", "N° RPPS"],
+                ["finess", "N° FINESS de l'établissement"],
               ] as const
             ).map(([cle, label]) => (
               <label key={cle} className="text-sm">
@@ -193,10 +201,25 @@ export default function Accueil() {
 
         <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              <span className="mb-1 block text-slate-600">Patient (non envoyé à l&apos;IA)</span>
-              <input value={patient} onChange={(e) => setPatient(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2" />
-            </label>
+            {(
+              [
+                ["nom", "Nom et prénom du patient", "text"],
+                ["naissance", "Date de naissance", "date"],
+                ["secu", "N° de sécurité sociale", "text"],
+              ] as const
+            ).map(([cle, label, type]) => (
+              <label key={cle} className="text-sm">
+                <span className="mb-1 block text-slate-600">
+                  {label} <span className="text-slate-400">(non envoyé à l&apos;IA)</span>
+                </span>
+                <input
+                  type={type}
+                  value={patient[cle]}
+                  onChange={(e) => setPatient({ ...patient, [cle]: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                />
+              </label>
+            ))}
             <label className="text-sm">
               <span className="mb-1 block text-slate-600">Date de la séance</span>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2" />
@@ -340,12 +363,14 @@ export default function Accueil() {
       </div>
 
       {analyse && (
-        <div className="print-only text-[11pt] text-black">
-          <EnTete cabinet={cabinet} patient={patient} date={date} titre={aImprimer === "cr" ? "Compte rendu de consultation" : "Devis de soins et de prothèses dentaires"} />
+        <div className="print-only text-black">
           {aImprimer === "cr" ? (
-            <CompteRenduImprimable analyse={analyse} realises={realises} />
+            <div className="text-[11pt]">
+              <EnTete cabinet={cabinet} patient={patient.nom} date={date} titre="Compte rendu de consultation" />
+              <CompteRenduImprimable analyse={analyse} realises={realises} />
+            </div>
           ) : (
-            <DevisImprimable lignes={proposes} />
+            <DevisConventionnel lignes={proposes} cabinet={cabinet} patient={patient} date={date} numero={numeroDevis} />
           )}
         </div>
       )}
@@ -374,6 +399,7 @@ function EditeurActes({
         <table className="w-full min-w-[640px] border-collapse">
           <thead>
             <tr className="border-b border-slate-200 text-left text-slate-500">
+              <th className="py-2 pr-2 font-medium" title="Numéro d'étape du traitement">Étape</th>
               <th className="py-2 pr-2 font-medium">Acte</th>
               <th className="py-2 pr-2 font-medium">Dents</th>
               <th className="py-2 pr-2 font-medium">Statut</th>
@@ -384,6 +410,16 @@ function EditeurActes({
           <tbody>
             {actes.map((a, i) => (
               <tr key={i} className="border-b border-slate-100 align-top">
+                <td className="py-2 pr-2">
+                  <input
+                    type="number"
+                    min={1}
+                    value={a.etape}
+                    onChange={(e) => onChange(i, { etape: Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-14 rounded border border-slate-300 px-2 py-1"
+                    aria-label="Étape"
+                  />
+                </td>
                 <td className="py-2 pr-2">
                   <select value={a.code} onChange={(e) => onChange(i, { code: e.target.value })} className="w-full max-w-xs rounded border border-slate-300 px-2 py-1">
                     {TARIFS.map((t) => (
@@ -540,23 +576,126 @@ function CompteRenduImprimable({ analyse, realises }: { analyse: Analyse; realis
   );
 }
 
-function DevisImprimable({ lignes }: { lignes: LigneDevis[] }) {
+const montant = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dateFr = (iso: string) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR") : "");
+
+/** Devis au format du modèle conventionnel utilisé par le cabinet. */
+function DevisConventionnel({
+  lignes,
+  cabinet,
+  patient,
+  date,
+  numero,
+}: {
+  lignes: LigneDevis[];
+  cabinet: Cabinet;
+  patient: Patient;
+  date: string;
+  numero: string;
+}) {
+  const t = totaliser(lignes);
+  const th = "border border-black px-1 py-0.5 text-center align-middle font-normal";
+  const td = "border border-black px-1 py-0.5";
+  const num = `${td} text-right tabular-nums`;
   return (
-    <div>
-      <TableauMontants lignes={lignes} />
-      <p className="mt-4">Devis valable 6 mois à compter de sa date d&apos;émission.</p>
-      <p className="mt-1 text-sm">
-        Les montants remboursés sont estimés sur la base des tarifs de l&apos;Assurance maladie. Le remboursement de votre
-        complémentaire santé dépend de votre contrat.
-      </p>
-      <div className="mt-12 grid grid-cols-2 gap-8">
-        <div>
-          <p>Signature du praticien</p>
-          <div className="mt-16 border-t border-black" />
+    <div className="page-devis text-[8.5pt] leading-tight">
+      <div className="mb-2 flex items-start justify-between gap-4">
+        <div className="flex-1 border border-black px-2 py-1 text-center">
+          <p className="font-semibold">
+            DEVIS POUR LES TRAITEMENTS ET ACTES BUCCO-DENTAIRES FAISANT L&apos;OBJET D&apos;UNE ENTENTE DIRECTE
+          </p>
+          <p>conformément aux dispositions de la convention nationale des chirurgiens-dentistes</p>
         </div>
-        <div>
-          <p>Bon pour accord, signature du patient</p>
-          <div className="mt-16 border-t border-black" />
+        <div className="text-right">
+          <p>Devis {numero}</p>
+          <p>Établi le {dateFr(date)}</p>
+        </div>
+      </div>
+
+      <div className="mb-3 grid grid-cols-2 border border-black">
+        <div className="border-r border-black px-2 py-1">
+          <p className="font-semibold">Identification du chirurgien-dentiste traitant</p>
+          <p>Docteur {cabinet.praticien}</p>
+          <p>
+            Identifiant du praticien : N° RPPS : {cabinet.rpps} - N° de l&apos;établissement (FINESS) : {cabinet.finess}
+          </p>
+          {cabinet.adresse && <p>{cabinet.adresse}</p>}
+        </div>
+        <div className="px-2 py-1">
+          <p className="font-semibold">Identification du patient</p>
+          <p>Nom et prénom : {patient.nom}</p>
+          <p>Date de naissance : {dateFr(patient.naissance)}</p>
+          <p>N° de sécurité sociale du patient : {patient.secu}</p>
+        </div>
+      </div>
+
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th colSpan={11} className={`${td} text-left`}>
+              <span className="text-[10pt] font-semibold">Traitement proposé</span> – Description précise et détaillée des
+              actes
+            </th>
+          </tr>
+          <tr>
+            <th className={th}>N° de traitement</th>
+            <th className={th}>N° dent ou localisation</th>
+            <th className={th}>Cotation CCAM, NGAP ou acte HN</th>
+            <th className={`${th} w-[28%]`}>Nature de l&apos;acte</th>
+            <th className={th}>Matériaux utilisés</th>
+            <th className={th}>Panier</th>
+            <th className={th}>Honoraires limite de facturation</th>
+            <th className={th}>Base de remboursement de l&apos;Assurance Maladie Obligatoire</th>
+            <th className={th}>Montant remboursé Assurance Maladie Obligatoire</th>
+            <th className={th}>Montant non remboursé Assurance Maladie Obligatoire</th>
+            <th className={th}>Honoraires dt prix de vente du dispositif médical sur mesure</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map((l, i) => {
+            const remboursable = l.acte.tauxAMO > 0;
+            return (
+              <tr key={i}>
+                <td className={`${td} text-center`}>{l.etape}</td>
+                <td className={`${td} text-center`}>{l.dents.join(", ") || (l.quantite > 1 ? `×${l.quantite}` : "")}</td>
+                <td className={td}>{l.acte.code}</td>
+                <td className={td}>
+                  {l.acte.libelle}
+                  {l.precision && <span className="block italic">{l.precision}</span>}
+                </td>
+                <td className={`${td} text-center`}>{l.acte.materiau ?? ""}</td>
+                <td className={`${td} text-center`}>{numeroPanier(l.acte.panier)}</td>
+                <td className={num}>{l.acte.limite !== undefined ? montant(l.acte.limite * l.quantite) : ""}</td>
+                <td className={num}>{remboursable ? montant(l.baseRemboursement) : "NR"}</td>
+                <td className={num}>{montant(l.remboursementAMO)}</td>
+                <td className={num}>{montant(l.resteACharge)}</td>
+                <td className={num}>{montant(l.honoraires)}</td>
+              </tr>
+            );
+          })}
+          <tr className="font-semibold">
+            <td colSpan={7} className={`${td} text-right`}>
+              TOTAL € (des actes envisagés)
+            </td>
+            <td className={num}>{montant(t.baseRemboursement)}</td>
+            <td className={num}>{montant(t.remboursementAMO)}</td>
+            <td className={num}>{montant(t.resteACharge)}</td>
+            <td className={num}>{montant(t.honoraires)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="mt-1">
+        Panier : 1 = 100 % santé (sans reste à charge), 2 = tarifs maîtrisés, 3 = tarifs libres. NR = non remboursable.
+        Devis valable 6 mois.
+      </p>
+
+      <div className="mt-3 grid grid-cols-2 gap-4">
+        <div className="h-28 border border-black px-2 py-1">
+          <p>Le patient ou son représentant légal reconnaît avoir eu la possibilité du choix de son traitement.</p>
+          <p>Date et signature du patient ou du (ou des) responsable(s) légal (légaux)</p>
+        </div>
+        <div className="h-28 border border-black px-2 py-1">
+          <p>Signature du chirurgien-dentiste</p>
         </div>
       </div>
     </div>
