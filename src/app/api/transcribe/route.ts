@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: "OPENAI_API_KEY n'est pas configuré côté serveur" },
-      { status: 500 }
+      { error: "Mode démo : la dictée vocale n'est pas encore activée. Tapez le texte ou chargez l'exemple." },
+      { status: 503 }
     );
   }
 

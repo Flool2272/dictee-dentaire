@@ -12,6 +12,11 @@ Prototype : la praticienne dicte, l'application rédige le compte rendu de consu
 4. **Relecture** : tout est modifiable avant export.
 5. **Export** : PDF du compte rendu et du devis (impression du navigateur), et texte à coller dans LogosW.
 
+## Mode démo
+
+Sans `ANTHROPIC_API_KEY`, l'analyse renvoie un résultat fictif (celui de la dictée d'exemple) pour tester
+l'interface, le devis et les PDF. Sans `OPENAI_API_KEY`, la dictée vocale est désactivée : il faut taper le texte.
+
 ## Grille tarifaire
 
 `src/lib/tarifs.ts` contient une grille **simulée**. Elle doit être remplacée par les codes CCAM, honoraires

@@ -52,6 +52,7 @@ export default function Accueil() {
   const [onglet, setOnglet] = useState<"cr" | "devis">("cr");
   const [aImprimer, setAImprimer] = useState<"cr" | "devis">("cr");
   const [copie, setCopie] = useState(false);
+  const [demo, setDemo] = useState(false);
 
   useEffect(() => {
     // Lecture différée : localStorage n'existe pas pendant le rendu serveur.
@@ -82,7 +83,9 @@ export default function Accueil() {
         setErreur(data.error ?? "Échec de la génération");
         return;
       }
-      setAnalyse(data as Analyse);
+      const { demo: estDemo, ...resultat } = data;
+      setDemo(Boolean(estDemo));
+      setAnalyse(resultat as Analyse);
       setOnglet("cr");
     } finally {
       setChargement(false);
@@ -268,6 +271,14 @@ export default function Accueil() {
                 </button>
               </div>
             </div>
+
+            {demo && (
+              <div className="mb-5 rounded-lg bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200">
+                <strong>Mode démo :</strong> aucune clé d&apos;IA n&apos;est configurée. Ce résultat est fictif et
+                correspond à la dictée d&apos;exemple, quel que soit le texte saisi. Le calcul du devis, les modifications
+                et les PDF fonctionnent normalement.
+              </div>
+            )}
 
             {(analyse.pointsAVerifier.length > 0 || analyse.actesNonReconnus.length > 0) && (
               <div className="mb-5 rounded-lg bg-orange-50 px-4 py-3 text-sm text-orange-900 ring-1 ring-orange-200">
