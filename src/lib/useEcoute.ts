@@ -36,6 +36,24 @@ function ecrire(cle: string, valeur: string) {
   }
 }
 
+/** Message compréhensible selon la raison du refus d'accès au micro. */
+function messageErreurMicro(e: unknown): string {
+  const nom = e instanceof DOMException ? e.name : "";
+  switch (nom) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Accès au micro refusé. Autorisez le micro pour ce site (icône à gauche de l'adresse), puis rechargez la page. Sur un ordinateur professionnel, l'accès peut être bloqué par votre service informatique : essayez depuis un téléphone.";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "Aucun micro détecté. Branchez un micro ou un casque, ou choisissez-en un autre dans « Micro et sensibilité ».";
+    case "NotReadableError":
+    case "AbortError":
+      return "Le micro est déjà utilisé par une autre application (Teams, Zoom…). Fermez-la, puis réessayez.";
+    default:
+      return "Micro inaccessible : vérifiez qu'il est branché et autorisé dans le navigateur.";
+  }
+}
+
 export function useEcoute(onTexte: (texte: string) => void) {
   const [actif, setActif] = useState(false);
   const [mode, setMode] = useState<ModeEcoute>("consultation");
@@ -131,8 +149,8 @@ export function useEcoute(onTexte: (texte: string) => void) {
           autoGainControl: false,
         },
       });
-    } catch {
-      setErreur("Micro inaccessible : vérifiez qu'il est branché et autorisé dans le navigateur.");
+    } catch (e) {
+      setErreur(messageErreurMicro(e));
       return;
     }
     listerMicros();
