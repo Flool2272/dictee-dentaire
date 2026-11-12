@@ -1,4 +1,4 @@
-# Dictée dentaire
+# Émail · Dictée et devis dentaires
 
 Prototype : la praticienne dicte, l'application rédige le compte rendu de consultation et prépare le devis.
 

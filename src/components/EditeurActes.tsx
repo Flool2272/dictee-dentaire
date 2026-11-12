@@ -84,7 +84,7 @@ export default function EditeurActes({
           </tbody>
         </table>
       </div>
-      <button onClick={onAdd} className="mt-3 text-teal-700 hover:underline">
+      <button onClick={onAdd} className="mt-3 text-[#4655d8] hover:underline">
         + Ajouter un acte
       </button>
 

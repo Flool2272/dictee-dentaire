@@ -230,13 +230,13 @@ export default function Accueil() {
         <header className="mb-6 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <Logo />
-            <span className="whitespace-nowrap text-base font-bold tracking-tight text-[#0b2a36] sm:text-lg">Dictée dentaire</span>
+            <span className="flex flex-col leading-none"><span className="font-display text-xl font-extrabold tracking-tight text-[#1b2340]">Émail</span><span className="mt-1 hidden text-xs text-slate-500 sm:block">Dictée et devis dentaires</span></span>
           </div>
           <nav className="flex gap-1 text-sm">
-            <button onClick={() => setReglagesOuverts((o) => !o)} className="rounded-full px-3 py-1.5 text-slate-600 hover:bg-white">
+            <button onClick={() => setReglagesOuverts((o) => !o)} className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-white">
               Cabinet
             </button>
-            <button onClick={deconnexion} className="rounded-full px-3 py-1.5 text-slate-600 hover:bg-white">
+            <button onClick={deconnexion} className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-white">
               Déconnexion
             </button>
           </nav>
@@ -303,7 +303,7 @@ export default function Accueil() {
 
         <section className="mt-5 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
-            <div className="flex rounded-full bg-slate-100 p-1 text-sm">
+            <div className="flex rounded-xl bg-slate-100 p-1 text-sm">
               {(
                 [
                   ["cr", "Compte rendu"],
@@ -314,7 +314,7 @@ export default function Accueil() {
                 <button
                   key={id}
                   onClick={() => setOnglet(id)}
-                  className={`rounded-full px-4 py-1.5 ${onglet === id ? "bg-white font-medium shadow-sm" : "text-slate-600"}`}
+                  className={`rounded-lg px-4 py-1.5 ${onglet === id ? "bg-white font-medium shadow-sm" : "text-slate-600"}`}
                 >
                   {label}
                 </button>
@@ -371,7 +371,7 @@ export default function Accueil() {
                       value={analyse.compteRendu[r.cle]}
                       onChange={(e) => majRubrique(r.cle, e.target.value)}
                       rows={Math.max(2, Math.ceil(analyse.compteRendu[r.cle].length / 60))}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2 leading-relaxed focus:border-cyan-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 leading-relaxed focus:border-[#4655d8] focus:outline-none"
                     />
                   </label>
                 ))}
@@ -414,11 +414,18 @@ export default function Accueil() {
 
 function Logo() {
   return (
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0b2a36]">
-      <svg viewBox="0 0 24 24" className="h-5 w-5 text-cyan-300" fill="currentColor" aria-hidden>
-        <path d="M7.5 2.5c1.6 0 2.7.8 4.5.8s2.9-.8 4.5-.8c2.6 0 4.5 2.2 4.5 5.3 0 2.4-.9 3.9-1.6 5.6-.8 1.9-1 4.2-1.6 6.4-.4 1.6-1.1 1.9-1.7 1.9-1 0-1.4-.9-1.7-2.6-.4-2.1-.9-3.9-2.4-3.9s-2 1.8-2.4 3.9c-.3 1.7-.7 2.6-1.7 2.6-.6 0-1.3-.3-1.7-1.9-.6-2.2-.8-4.5-1.6-6.4C3.9 11.7 3 10.2 3 7.8 3 4.7 4.9 2.5 7.5 2.5Z" />
-      </svg>
-    </span>
+    <svg width="36" height="36" viewBox="0 0 64 64" className="shrink-0" role="img" aria-label="Émail">
+      <circle cx="32" cy="32" r="30" fill="#1b2340" />
+      <path d="M18 24a16 16 0 0 1 14-10" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" />
+      <path
+        d="M16 36c4 0 4-8 8-8s4 14 8 14 4-18 8-18 4 12 8 12"
+        fill="none"
+        stroke="#a9b4ff"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -440,7 +447,7 @@ function Champ({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-cyan-500 focus:outline-none"
+        className="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-[#4655d8] focus:outline-none"
       />
     </label>
   );
@@ -449,18 +456,18 @@ function Champ({
 function Pastille({ ton, children }: { ton: "ecoute" | "calcul" | "pret" | "neutre"; children: React.ReactNode }) {
   const styles = {
     ecoute: "bg-red-50 text-red-700 ring-red-200",
-    calcul: "bg-cyan-50 text-cyan-800 ring-cyan-200",
+    calcul: "bg-[#ecedfe] text-[#2f3aa6] ring-[#d5d9fb]",
     pret: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     neutre: "bg-slate-100 text-slate-600 ring-slate-200",
   }[ton];
   const point = {
     ecoute: "bg-red-500 animate-pulse",
-    calcul: "bg-cyan-500 animate-pulse",
+    calcul: "bg-[#4655d8] animate-pulse",
     pret: "bg-emerald-500",
     neutre: "bg-slate-400",
   }[ton];
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ${styles}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-medium ring-1 ${styles}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${point}`} />
       {children}
     </span>
@@ -516,7 +523,7 @@ function CarteEcoute({
     <>
       Parlez normalement.
       <br />
-      <span className="text-cyan-300">Le devis se remplit.</span>
+      <span className="text-[#a9b4ff]">Le devis se remplit.</span>
     </>
   );
   if (simulation)
@@ -524,7 +531,7 @@ function CarteEcoute({
       <>
         Ça écoute,
         <br />
-        <span className="text-cyan-300">ça code, ça chiffre.</span>
+        <span className="text-[#a9b4ff]">ça code, ça chiffre.</span>
       </>
     );
   else if (ecoute.actif && dictee)
@@ -532,13 +539,13 @@ function CarteEcoute({
       <>
         Je vous écoute.
         <br />
-        <span className="text-cyan-300">Remettez la sourdine pour finir.</span>
+        <span className="text-[#a9b4ff]">Remettez la sourdine pour finir.</span>
       </>
     ) : (
       <>
         En veille.
         <br />
-        <span className="text-cyan-300">Coupez la sourdine pour dicter.</span>
+        <span className="text-[#a9b4ff]">Coupez la sourdine pour dicter.</span>
       </>
     );
   else if (ecoute.actif)
@@ -546,37 +553,36 @@ function CarteEcoute({
       <>
         Ça écoute,
         <br />
-        <span className="text-cyan-300">ça code, ça chiffre.</span>
+        <span className="text-[#a9b4ff]">ça code, ça chiffre.</span>
       </>
     );
 
   return (
-    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0b2a36] via-[#0d3442] to-[#0f4a58] p-6 text-white shadow-lg sm:p-8 lg:col-span-7">
-      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+    <section className="relative overflow-hidden rounded-3xl bg-[#1b2340] p-6 text-white shadow-lg sm:p-8 lg:col-span-7">
 
       <div className="relative flex items-center justify-between gap-3">
         {enCours ? (
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium ring-1 ring-white/20">
+          <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1 text-xs font-medium ring-1 ring-white/20">
             <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
             {simulation ? "Simulation" : ecoute.enregistre || !dictee ? "Écoute en cours" : "En veille"}
             {ecoute.actif && <span className="tabular-nums text-white/60">{chrono}</span>}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80 ring-1 ring-white/20">
-            <span className="h-2 w-2 rounded-full bg-cyan-300" />
+          <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1 text-xs font-medium text-white/80 ring-1 ring-white/20">
+            <span className="h-2 w-2 rounded-full bg-[#a9b4ff]" />
             Prêt
           </span>
         )}
         {ecoute.enTranscription > 0 && <span className="text-xs text-white/60">Transcription…</span>}
       </div>
 
-      <h1 className="relative mt-6 text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-4xl">{titre}</h1>
+      <h1 className="relative mt-6 font-display text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-4xl">{titre}</h1>
 
       <div className="relative mt-6 flex h-12 items-end gap-1" aria-hidden>
         {historique.map((v, i) => (
           <span
             key={i}
-            className={`flex-1 rounded-full transition-[height] duration-100 ${v > ecoute.seuil ? "bg-cyan-300" : "bg-white/20"}`}
+            className={`flex-1 rounded-full transition-[height] duration-100 ${v > ecoute.seuil ? "bg-[#a9b4ff]" : "bg-white/20"}`}
             style={{ height: `${Math.max(8, Math.min(100, (v / 0.08) * 100))}%` }}
           />
         ))}
@@ -591,14 +597,14 @@ function CarteEcoute({
 
       <div className="relative mt-6 flex flex-wrap items-center gap-3">
         {ecoute.actif ? (
-          <button onClick={onTerminer} className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#0b2a36] shadow hover:bg-cyan-50">
+          <button onClick={onTerminer} className="rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[#1b2340] shadow hover:bg-[#ecedfe]">
             Terminer la consultation
           </button>
         ) : (
           <button
             onClick={onDemarrer}
             disabled={simulation !== null}
-            className="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-6 py-3 text-sm font-semibold text-[#0b2a36] shadow hover:bg-cyan-300 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#4655d8] px-6 py-3 text-sm font-semibold text-white shadow hover:bg-[#3a48c4] disabled:opacity-50"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
               <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />
@@ -608,7 +614,7 @@ function CarteEcoute({
         )}
 
         {!enCours && (
-          <div className="flex rounded-full bg-white/10 p-1 text-xs ring-1 ring-white/15">
+          <div className="flex rounded-xl bg-white/10 p-1 text-xs ring-1 ring-white/15">
             {(
               [
                 ["consultation", "Consultation complète"],
@@ -618,7 +624,7 @@ function CarteEcoute({
               <button
                 key={id}
                 onClick={() => ecoute.choisirMode(id)}
-                className={`rounded-full px-3 py-1.5 ${ecoute.mode === id ? "bg-white font-medium text-[#0b2a36]" : "text-white/75"}`}
+                className={`rounded-lg px-3 py-1.5 ${ecoute.mode === id ? "bg-white font-medium text-[#1b2340]" : "text-white/75"}`}
               >
                 {label}
               </button>
@@ -666,7 +672,7 @@ function CarteEcoute({
               step={0.001}
               value={ecoute.seuil}
               onChange={(e) => ecoute.regler(Number(e.target.value))}
-              className="flex-1 accent-cyan-300"
+              className="flex-1 accent-[#a9b4ff]"
               style={{ direction: "rtl" }}
             />
           </label>
@@ -692,7 +698,7 @@ function CarteEcoute({
           </select>
           <button
             onClick={() => onSimuler(cas)}
-            className="rounded-full bg-white/10 px-3 py-1 font-medium text-white ring-1 ring-white/20 hover:bg-white/20"
+            className="rounded-lg bg-white/10 px-3 py-1 font-medium text-white ring-1 ring-white/20 hover:bg-white/20"
           >
             Simuler la consultation
           </button>
@@ -743,8 +749,8 @@ function CarteDevis({
         <div className="flex min-w-0 items-center gap-3">
           <Logo />
           <div className="min-w-0">
-            <p className="font-semibold leading-tight text-[#0b2a36]">Devis · Plan de traitement</p>
-            <button onClick={onIdentite} className="truncate text-left text-xs text-slate-500 hover:text-cyan-700">
+            <p className="font-semibold leading-tight text-[#1b2340]">Devis · Plan de traitement</p>
+            <button onClick={onIdentite} className="truncate text-left text-xs text-slate-500 hover:text-[#4655d8]">
               {patient.nom || "Patient"} · consultation du {dateFr} {identiteOuverte ? "▴" : "▾"}
             </button>
           </div>
@@ -781,7 +787,7 @@ function CarteDevis({
               <li key={`n-${i}`} className="apparition grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 py-3">
                 <span className="rounded-lg bg-amber-50 px-2 py-1.5 text-center font-mono text-xs font-semibold text-amber-800">?</span>
                 <span className="text-sm text-slate-700">{n}</span>
-                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">À coter</span>
+                <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">À coter</span>
               </li>
             ))}
             {realises.length > 0 && (
@@ -798,7 +804,7 @@ function CarteDevis({
         <div className="mx-5 mb-4 mt-2 flex items-end justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
           <div>
             <p className="text-xs text-slate-500">Total du devis</p>
-            <p className="text-2xl font-extrabold tracking-tight text-[#0b2a36] tabular-nums">{euros(total.honoraires)}</p>
+            <p className="font-mono text-2xl font-semibold tracking-tight text-[#1b2340] tabular-nums">{euros(total.honoraires)}</p>
           </div>
           <div className="text-right text-xs text-slate-500">
             <p>Remb. Sécu : {euros(total.remboursementAMO)}</p>
@@ -811,21 +817,21 @@ function CarteDevis({
         <button
           onClick={() => onImprimer("devis")}
           disabled={proposes.length === 0}
-          className="rounded-full bg-[#0b2a36] px-4 py-2 text-sm font-semibold text-white hover:bg-[#123f4f] disabled:opacity-40"
+          className="rounded-xl bg-[#1b2340] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2a3560] disabled:opacity-40"
         >
           Imprimer le devis
         </button>
         <button
           onClick={() => onImprimer("cr")}
           disabled={!analyse}
-          className="rounded-full px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
+          className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
         >
           Compte rendu
         </button>
         <button
           onClick={onCopier}
           disabled={!analyse}
-          className="rounded-full px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
+          className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
         >
           {copie ? "Copié ✓" : "Copier le texte"}
         </button>
@@ -837,18 +843,18 @@ function CarteDevis({
 function LigneActe({ ligne, index, badge }: { ligne: LigneDevis; index: number; badge: "chiffre" | "realise" }) {
   return (
     <li className="apparition grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 py-3" style={{ animationDelay: `${index * 120}ms` }}>
-      <span className="rounded-lg bg-cyan-50 px-2 py-1.5 text-center font-mono text-xs font-bold tracking-wide text-[#0e5566]">
+      <span className="rounded-lg bg-[#ecedfe] px-2 py-1.5 text-center font-mono text-xs font-semibold tracking-wide text-[#2f3aa6]">
         {ligne.acte.code}
       </span>
       <span className="min-w-0">
-        <span className="line-clamp-2 text-sm font-semibold leading-snug text-[#0b2a36]">{ligne.acte.libelle}</span>
+        <span className="line-clamp-2 text-sm font-semibold leading-snug text-[#1b2340]">{ligne.acte.libelle}</span>
         <span className="block text-xs text-slate-500">
           {ligne.dents.length ? `Dent ${ligne.dents.join(", ")} · ` : ligne.quantite > 1 ? `×${ligne.quantite} · ` : ""}
           {euros(ligne.honoraires)}
         </span>
       </span>
       {badge === "chiffre" ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
           <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
             <path
               fillRule="evenodd"
@@ -858,7 +864,7 @@ function LigneActe({ ligne, index, badge }: { ligne: LigneDevis; index: number; 
           Chiffré
         </span>
       ) : (
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Réalisé</span>
+        <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Réalisé</span>
       )}
     </li>
   );
@@ -887,13 +893,13 @@ function OngletTexte({
         rows={8}
         disabled={occupe}
         placeholder="La transcription de la consultation apparaît ici. Vous pouvez aussi taper, coller ou corriger le texte, puis le chiffrer."
-        className="w-full rounded-xl border border-slate-200 px-3 py-2 leading-relaxed focus:border-cyan-500 focus:outline-none disabled:bg-slate-50"
+        className="w-full rounded-xl border border-slate-200 px-3 py-2 leading-relaxed focus:border-[#4655d8] focus:outline-none disabled:bg-slate-50"
       />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           onClick={onChiffrer}
           disabled={occupe || chiffrage || !texte.trim()}
-          className="rounded-full bg-[#0b2a36] px-4 py-2 font-semibold text-white hover:bg-[#123f4f] disabled:opacity-40"
+          className="rounded-xl bg-[#1b2340] px-4 py-2 font-semibold text-white hover:bg-[#2a3560] disabled:opacity-40"
         >
           {chiffrage ? "Chiffrage…" : "Chiffrer ce texte"}
         </button>
@@ -904,7 +910,7 @@ function OngletTexte({
             if (cas) onChange(cas.dictee);
           }}
           disabled={occupe}
-          className="rounded-full border border-slate-200 px-3 py-2 text-slate-600"
+          className="rounded-xl border border-slate-200 px-3 py-2 text-slate-600"
         >
           <option value="">Charger un texte d&apos;exemple…</option>
           {CAS_DEMO.map((c) => (
