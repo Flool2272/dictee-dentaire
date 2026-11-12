@@ -1,29 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import Dictaphone from "@/components/Dictaphone";
+import EditeurActes from "@/components/EditeurActes";
+import { CompteRenduImprimable, DevisConventionnel, EnTete } from "@/components/Documents";
 import type { ActeExtrait, Analyse } from "@/lib/schema";
-import { TARIFS, numeroPanier } from "@/lib/tarifs";
+import { TARIFS } from "@/lib/tarifs";
 import { CAS_DEMO } from "@/lib/demo";
 import { calculerLignes, euros, totaliser, type LigneDevis } from "@/lib/devis";
-
-type Cabinet = { praticien: string; adresse: string; telephone: string; rpps: string; finess: string };
-const CABINET_VIDE: Cabinet = { praticien: "", adresse: "", telephone: "", rpps: "", finess: "" };
-
-// Identité du patient : saisie et imprimée localement, jamais envoyée à l'IA ni stockée.
-type Patient = { nom: string; naissance: string; secu: string };
-
-const RUBRIQUES: { cle: keyof Analyse["compteRendu"]; titre: string }[] = [
-  { cle: "motif", titre: "Motif de consultation" },
-  { cle: "antecedents", titre: "Antécédents" },
-  { cle: "examenClinique", titre: "Examen clinique" },
-  { cle: "examensComplementaires", titre: "Examens complémentaires" },
-  { cle: "diagnostic", titre: "Diagnostic" },
-  { cle: "soinsRealises", titre: "Soins réalisés" },
-  { cle: "planTraitement", titre: "Plan de traitement" },
-  { cle: "conseils", titre: "Conseils au patient" },
-];
+import { CABINET_VIDE, RUBRIQUES, type Cabinet, type Patient } from "@/lib/types";
+import { useEcoute } from "@/lib/useEcoute";
 
 function lireCabinet(): Cabinet {
   try {
@@ -34,21 +20,25 @@ function lireCabinet(): Cabinet {
   }
 }
 
+const joindre = (avant: string, ajout: string) => (avant ? `${avant} ${ajout}` : ajout);
+
 export default function Accueil() {
   const router = useRouter();
   const [cabinet, setCabinet] = useState<Cabinet>(CABINET_VIDE);
   const [reglagesOuverts, setReglagesOuverts] = useState(false);
   const [patient, setPatient] = useState<Patient>({ nom: "", naissance: "", secu: "" });
-  const [numeroDevis, setNumeroDevis] = useState("");
+  const [identiteOuverte, setIdentiteOuverte] = useState(false);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [dictee, setDictee] = useState("");
+  const [texte, setTexte] = useState("");
   const [analyse, setAnalyse] = useState<Analyse | null>(null);
-  const [chargement, setChargement] = useState(false);
+  const [chiffrage, setChiffrage] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [onglet, setOnglet] = useState<"cr" | "devis">("cr");
-  const [aImprimer, setAImprimer] = useState<"cr" | "devis">("cr");
-  const [copie, setCopie] = useState(false);
   const [demo, setDemo] = useState<"exact" | "approx" | null>(null);
+  const [onglet, setOnglet] = useState<"cr" | "actes" | "texte">("cr");
+  const [aImprimer, setAImprimer] = useState<"cr" | "devis">("devis");
+  const [copie, setCopie] = useState(false);
+  const [numeroDevis, setNumeroDevis] = useState("");
+  const [simulation, setSimulation] = useState<string | null>(null);
 
   useEffect(() => {
     // Lecture différée : localStorage n'existe pas pendant le rendu serveur.
@@ -65,29 +55,105 @@ export default function Accueil() {
     }
   }
 
-  async function generer() {
-    setErreur(null);
-    setChargement(true);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dictee }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setErreur(data.error ?? "Échec de la génération");
+  // ----- Chiffrage (analyse par l'IA), relancé à chaque nouveau morceau de texte -----
+
+  const enVolRef = useRef(false);
+  const enAttenteRef = useRef<string | null>(null);
+
+  const chiffrer = useCallback(
+    async (contenu: string) => {
+      if (!contenu.trim()) return;
+      if (enVolRef.current) {
+        // Un chiffrage est déjà en cours : on relancera avec le texte le plus récent.
+        enAttenteRef.current = contenu;
         return;
       }
-      const { demo: estDemo, ...resultat } = data;
-      setDemo(estDemo === "exact" || estDemo === "approx" ? estDemo : null);
-      setAnalyse(resultat as Analyse);
-      setNumeroDevis(`${date.replaceAll("-", "")}-${Math.floor(1000 + Math.random() * 9000)}`);
-      setOnglet("cr");
-    } finally {
-      setChargement(false);
-    }
+      enVolRef.current = true;
+      setChiffrage(true);
+      setErreur(null);
+      let courant: string | null = contenu;
+      while (courant) {
+        try {
+          const res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dictee: courant }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            setErreur(data.error ?? "Échec du chiffrage");
+          } else {
+            const { demo: estDemo, ...resultat } = data;
+            setDemo(estDemo === "exact" || estDemo === "approx" ? estDemo : null);
+            setAnalyse(resultat as Analyse);
+            setNumeroDevis((n) => n || `${date.replaceAll("-", "")}-${Math.floor(1000 + Math.random() * 9000)}`);
+          }
+        } catch {
+          setErreur("Impossible de contacter le serveur");
+        }
+        courant = enAttenteRef.current;
+        enAttenteRef.current = null;
+      }
+      enVolRef.current = false;
+      setChiffrage(false);
+    },
+    [date]
+  );
+
+  // Pendant l'écoute, chaque morceau transcrit s'ajoute au texte et relance le chiffrage.
+  const texteRef = useRef("");
+  const minuteurChiffrage = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ajouterTexte = useCallback(
+    (morceau: string, relancer = true) => {
+      texteRef.current = joindre(texteRef.current, morceau);
+      setTexte(texteRef.current);
+      if (!relancer) return;
+      if (minuteurChiffrage.current) clearTimeout(minuteurChiffrage.current);
+      minuteurChiffrage.current = setTimeout(() => chiffrer(texteRef.current), 800);
+    },
+    [chiffrer]
+  );
+
+  const ecoute = useEcoute(ajouterTexte);
+
+  function nouvelleConsultation() {
+    texteRef.current = "";
+    setTexte("");
+    setAnalyse(null);
+    setDemo(null);
+    setErreur(null);
+    setNumeroDevis("");
+    setPatient({ nom: "", naissance: "", secu: "" });
   }
+
+  async function demarrer() {
+    if (analyse || texte) nouvelleConsultation();
+    await ecoute.demarrer();
+  }
+
+  function terminer() {
+    ecoute.arreter();
+    // Dernier chiffrage une fois les dernières transcriptions arrivées.
+    setTimeout(() => chiffrer(texteRef.current), 1500);
+  }
+
+  // ----- Simulation : rejoue une consultation fictive, phrase par phrase -----
+
+  async function simuler(id: string) {
+    const cas = CAS_DEMO.find((c) => c.id === id);
+    if (!cas || simulation) return;
+    nouvelleConsultation();
+    setSimulation(id);
+    const phrases = cas.dictee.match(/[^.:]+[.:]\s*/g) ?? [cas.dictee];
+    for (const p of phrases) {
+      await new Promise((r) => setTimeout(r, 700));
+      ajouterTexte(p.trim(), false);
+    }
+    await chiffrer(cas.dictee);
+    setSimulation(null);
+  }
+
+  // ----- Données dérivées -----
 
   const realises = useMemo(
     () => calculerLignes(analyse?.actes.filter((a) => a.statut === "realise") ?? []),
@@ -106,8 +172,7 @@ export default function Accueil() {
 
   function majActe(index: number, modif: Partial<ActeExtrait>) {
     if (!analyse) return;
-    const actes = analyse.actes.map((a, i) => (i === index ? { ...a, ...modif } : a));
-    setAnalyse({ ...analyse, actes });
+    setAnalyse({ ...analyse, actes: analyse.actes.map((a, i) => (i === index ? { ...a, ...modif } : a)) });
   }
 
   function supprimerActe(index: number) {
@@ -118,30 +183,36 @@ export default function Accueil() {
   function ajouterActe() {
     if (!analyse) return;
     const derniereEtape = Math.max(0, ...analyse.actes.map((a) => a.etape));
-    const nouvel: ActeExtrait = { etape: derniereEtape || 1, code: TARIFS[0].code, dents: [], quantite: 1, statut: "propose", precision: "" };
+    const nouvel: ActeExtrait = {
+      etape: derniereEtape || 1,
+      code: TARIFS[0].code,
+      dents: [],
+      quantite: 1,
+      statut: "propose",
+      precision: "",
+    };
     setAnalyse({ ...analyse, actes: [...analyse.actes, nouvel] });
   }
 
   function imprimer(doc: "cr" | "devis") {
     setAImprimer(doc);
-    // Laisse React afficher le bon document avant d'ouvrir la boîte d'impression.
     setTimeout(() => window.print(), 50);
   }
 
-  async function copierPourLogiciel() {
+  async function copier() {
     if (!analyse) return;
     const lignesActes = (lignes: LigneDevis[]) =>
       lignes
         .map((l) => `- ${l.acte.code} ${l.acte.libelle}${l.dents.length ? ` (dent ${l.dents.join(", ")})` : ""}`)
         .join("\n");
-    const texte = [
+    const contenu = [
       ...RUBRIQUES.map((r) => `${r.titre.toUpperCase()}\n${analyse.compteRendu[r.cle]}`),
       realises.length ? `ACTES RÉALISÉS\n${lignesActes(realises)}` : "",
       proposes.length ? `ACTES PROPOSÉS\n${lignesActes(proposes)}` : "",
     ]
       .filter(Boolean)
       .join("\n\n");
-    await navigator.clipboard.writeText(texte);
+    await navigator.clipboard.writeText(contenu);
     setCopie(true);
     setTimeout(() => setCopie(false), 2000);
   }
@@ -151,199 +222,156 @@ export default function Accueil() {
     router.replace("/login");
   }
 
+  const occupe = ecoute.actif || simulation !== null;
+
   return (
     <>
-      <div className="no-print mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
-        <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">Dictée dentaire</h1>
-            <p className="text-sm text-slate-500">Compte rendu et devis à partir de votre dictée</p>
+      <div className="no-print mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-5 sm:px-6">
+        <header className="mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Logo />
+            <span className="whitespace-nowrap text-base font-bold tracking-tight text-[#0b2a36] sm:text-lg">Dictée dentaire</span>
           </div>
-          <div className="flex gap-2 text-sm">
-            <button onClick={() => setReglagesOuverts((o) => !o)} className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-200">
+          <nav className="flex gap-1 text-sm">
+            <button onClick={() => setReglagesOuverts((o) => !o)} className="rounded-full px-3 py-1.5 text-slate-600 hover:bg-white">
               Cabinet
             </button>
-            <button onClick={deconnexion} className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-200">
+            <button onClick={deconnexion} className="rounded-full px-3 py-1.5 text-slate-600 hover:bg-white">
               Déconnexion
             </button>
-          </div>
+          </nav>
         </header>
 
-        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <strong>Prototype.</strong> La grille tarifaire est en partie simulée : seuls les actes repris du devis du cabinet
-          ont des montants réels. Ne dictez pas l&apos;identité du patient : saisissez-la dans les champs prévus, elle reste
-          dans le navigateur et n&apos;est pas envoyée à l&apos;IA.
-        </div>
-
         {reglagesOuverts && (
-          <section className="mb-6 grid gap-3 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:grid-cols-2">
-            <h2 className="font-medium sm:col-span-2">En-tête des documents</h2>
+          <section className="mb-6 grid gap-3 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:grid-cols-2">
+            <h2 className="font-semibold sm:col-span-2">Cabinet (en-tête des documents)</h2>
             {(
               [
-                ["praticien", "Praticien (ex. Dr Marie Dupont)"],
+                ["praticien", "Praticien (ex. Marie Dupont)"],
                 ["adresse", "Adresse du cabinet"],
                 ["telephone", "Téléphone"],
                 ["rpps", "N° RPPS"],
                 ["finess", "N° FINESS de l'établissement"],
               ] as const
             ).map(([cle, label]) => (
-              <label key={cle} className="text-sm">
-                <span className="mb-1 block text-slate-600">{label}</span>
-                <input
-                  value={cabinet[cle]}
-                  onChange={(e) => majCabinet({ ...cabinet, [cle]: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
-              </label>
+              <Champ key={cle} label={label} value={cabinet[cle]} onChange={(v) => majCabinet({ ...cabinet, [cle]: v })} />
             ))}
           </section>
         )}
 
-        <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-          <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["nom", "Nom et prénom du patient", "text"],
-                ["naissance", "Date de naissance", "date"],
-                ["secu", "N° de sécurité sociale", "text"],
-              ] as const
-            ).map(([cle, label, type]) => (
-              <label key={cle} className="text-sm">
-                <span className="mb-1 block text-slate-600">
-                  {label} <span className="text-slate-400">(non envoyé à l&apos;IA)</span>
-                </span>
-                <input
-                  type={type}
-                  value={patient[cle]}
-                  onChange={(e) => setPatient({ ...patient, [cle]: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                />
-              </label>
-            ))}
-            <label className="text-sm">
-              <span className="mb-1 block text-slate-600">Date de la séance</span>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2" />
-            </label>
-          </div>
-
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <Dictaphone onTranscription={(t) => setDictee((d) => (d ? `${d}\n${t}` : t))} />
-            <select
-              value=""
-              onChange={(e) => {
-                const cas = CAS_DEMO.find((c) => c.id === e.target.value);
-                if (cas) setDictee(cas.dictee);
-              }}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-teal-800"
-            >
-              <option value="">Charger une dictée d&apos;exemple…</option>
-              {CAS_DEMO.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.titre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <textarea
-            value={dictee}
-            onChange={(e) => setDictee(e.target.value)}
-            rows={7}
-            placeholder="La transcription de votre dictée apparaît ici. Vous pouvez aussi taper ou corriger le texte."
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm leading-relaxed"
+        <div className="grid gap-5 lg:grid-cols-12">
+          <CarteEcoute
+            ecoute={ecoute}
+            texte={texte}
+            simulation={simulation}
+            onDemarrer={demarrer}
+            onTerminer={terminer}
+            onSimuler={simuler}
           />
-          <div className="mt-3 flex items-center gap-3">
-            <button
-              onClick={generer}
-              disabled={chargement || !dictee.trim()}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-            >
-              {chargement ? "Rédaction en cours..." : "Générer le compte rendu et le devis"}
-            </button>
-            {erreur && <p className="text-sm text-red-600">{erreur}</p>}
-          </div>
-        </section>
 
-        {analyse && (
-          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex rounded-lg bg-slate-100 p-1 text-sm">
-                {(
-                  [
-                    ["cr", "Compte rendu"],
-                    ["devis", "Actes et devis"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    onClick={() => setOnglet(id)}
-                    className={`rounded-md px-3 py-1.5 ${onglet === id ? "bg-white shadow-sm" : "text-slate-600"}`}
-                  >
-                    {label}
-                  </button>
-                ))}
+          <CarteDevis
+            patient={patient}
+            date={date}
+            ecouteActive={occupe}
+            chiffrage={chiffrage}
+            analyse={analyse}
+            realises={realises}
+            proposes={proposes}
+            copie={copie}
+            onImprimer={imprimer}
+            onCopier={copier}
+            identiteOuverte={identiteOuverte}
+            onIdentite={() => setIdentiteOuverte((o) => !o)}
+          >
+            {identiteOuverte && (
+              <div className="grid gap-3 border-t border-slate-100 px-5 py-4 sm:grid-cols-2">
+                <Champ label="Nom et prénom" value={patient.nom} onChange={(v) => setPatient({ ...patient, nom: v })} />
+                <Champ label="N° de sécurité sociale" value={patient.secu} onChange={(v) => setPatient({ ...patient, secu: v })} />
+                <Champ label="Date de naissance" type="date" value={patient.naissance} onChange={(v) => setPatient({ ...patient, naissance: v })} />
+                <Champ label="Date de la séance" type="date" value={date} onChange={setDate} />
+                <p className="text-xs text-slate-500 sm:col-span-2">
+                  Ces informations servent uniquement à l&apos;impression : elles ne sont ni envoyées à l&apos;IA ni enregistrées.
+                </p>
               </div>
-              <div className="flex flex-wrap gap-2 text-sm">
-                <button onClick={copierPourLogiciel} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
-                  {copie ? "Copié ✓" : "Copier pour LogosW"}
-                </button>
-                <button onClick={() => imprimer("cr")} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
-                  PDF compte rendu
-                </button>
+            )}
+          </CarteDevis>
+        </div>
+
+        {(erreur || ecoute.erreur) && (
+          <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{erreur ?? ecoute.erreur}</p>
+        )}
+
+        <section className="mt-5 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+            <div className="flex rounded-full bg-slate-100 p-1 text-sm">
+              {(
+                [
+                  ["cr", "Compte rendu"],
+                  ["actes", "Détail des actes"],
+                  ["texte", "Transcription"],
+                ] as const
+              ).map(([id, label]) => (
                 <button
-                  onClick={() => imprimer("devis")}
-                  disabled={proposes.length === 0}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
+                  key={id}
+                  onClick={() => setOnglet(id)}
+                  className={`rounded-full px-4 py-1.5 ${onglet === id ? "bg-white font-medium shadow-sm" : "text-slate-600"}`}
                 >
-                  PDF devis
+                  {label}
                 </button>
-              </div>
+              ))}
             </div>
+            <p className="text-xs text-slate-500">Tout est modifiable avant impression.</p>
+          </div>
 
+          <div className="p-5">
             {demo && (
-              <div className="mb-5 rounded-lg bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200">
-                <strong>Mode démo :</strong> aucune clé d&apos;IA n&apos;est configurée, ce résultat est fictif.{" "}
+              <p className="mb-4 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-200">
+                <strong>Mode démo :</strong> aucune clé d&apos;IA n&apos;est configurée, le résultat est fictif.{" "}
                 {demo === "exact"
-                  ? "Il correspond à la dictée d'exemple choisie."
-                  : "Le texte saisi ne correspond à aucun exemple : le premier cas fictif est affiché à la place."}{" "}
-                Le calcul du devis, les modifications et les PDF fonctionnent normalement.
+                  ? "Il correspond à la consultation d'exemple choisie."
+                  : "Le texte ne correspond à aucun exemple : le premier cas fictif est affiché."}
+              </p>
+            )}
+
+            {analyse && (analyse.pointsAVerifier.length > 0 || analyse.actesNonReconnus.length > 0) && onglet !== "texte" && (
+              <div className="mb-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                <p className="font-medium">À vérifier</p>
+                <ul className="list-disc pl-5">
+                  {analyse.pointsAVerifier.map((p, i) => (
+                    <li key={`p${i}`}>{p}</li>
+                  ))}
+                  {analyse.actesNonReconnus.map((p, i) => (
+                    <li key={`n${i}`}>Acte absent de la grille, non chiffré : {p}</li>
+                  ))}
+                </ul>
               </div>
             )}
 
-            {(analyse.pointsAVerifier.length > 0 || analyse.actesNonReconnus.length > 0) && (
-              <div className="mb-5 rounded-lg bg-orange-50 px-4 py-3 text-sm text-orange-900 ring-1 ring-orange-200">
-                {analyse.pointsAVerifier.length > 0 && (
-                  <>
-                    <p className="font-medium">À vérifier</p>
-                    <ul className="mb-2 list-disc pl-5">
-                      {analyse.pointsAVerifier.map((p, i) => (
-                        <li key={i}>{p}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                {analyse.actesNonReconnus.length > 0 && (
-                  <>
-                    <p className="font-medium">Actes absents de la grille (non chiffrés)</p>
-                    <ul className="list-disc pl-5">
-                      {analyse.actesNonReconnus.map((p, i) => (
-                        <li key={i}>{p}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            )}
-
-            {onglet === "cr" ? (
-              <div className="grid gap-4">
+            {onglet === "texte" ? (
+              <OngletTexte
+                texte={texte}
+                occupe={occupe}
+                chiffrage={chiffrage}
+                onChange={(v) => {
+                  texteRef.current = v;
+                  setTexte(v);
+                }}
+                onChiffrer={() => chiffrer(texteRef.current)}
+              />
+            ) : !analyse ? (
+              <p className="py-10 text-center text-sm text-slate-500">
+                Démarrez une consultation, ou tapez un texte dans l&apos;onglet Transcription.
+              </p>
+            ) : onglet === "cr" ? (
+              <div className="grid gap-4 md:grid-cols-2">
                 {RUBRIQUES.map((r) => (
                   <label key={r.cle} className="text-sm">
                     <span className="mb-1 block font-medium text-slate-700">{r.titre}</span>
                     <textarea
                       value={analyse.compteRendu[r.cle]}
                       onChange={(e) => majRubrique(r.cle, e.target.value)}
-                      rows={Math.max(2, Math.ceil(analyse.compteRendu[r.cle].length / 90))}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 leading-relaxed"
+                      rows={Math.max(2, Math.ceil(analyse.compteRendu[r.cle].length / 60))}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 leading-relaxed focus:border-cyan-500 focus:outline-none"
                     />
                   </label>
                 ))}
@@ -358,8 +386,12 @@ export default function Accueil() {
                 proposes={proposes}
               />
             )}
-          </section>
-        )}
+          </div>
+        </section>
+
+        <p className="mt-6 text-center text-xs text-slate-500">
+          Prototype : grille tarifaire en partie simulée. Ne prononcez pas l&apos;identité du patient pendant l&apos;écoute.
+        </p>
       </div>
 
       {analyse && (
@@ -378,325 +410,509 @@ export default function Accueil() {
   );
 }
 
-function EditeurActes({
-  actes,
+// ---------------------------------------------------------------------------
+
+function Logo() {
+  return (
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#0b2a36]">
+      <svg viewBox="0 0 24 24" className="h-5 w-5 text-cyan-300" fill="currentColor" aria-hidden>
+        <path d="M7.5 2.5c1.6 0 2.7.8 4.5.8s2.9-.8 4.5-.8c2.6 0 4.5 2.2 4.5 5.3 0 2.4-.9 3.9-1.6 5.6-.8 1.9-1 4.2-1.6 6.4-.4 1.6-1.1 1.9-1.7 1.9-1 0-1.4-.9-1.7-2.6-.4-2.1-.9-3.9-2.4-3.9s-2 1.8-2.4 3.9c-.3 1.7-.7 2.6-1.7 2.6-.6 0-1.3-.3-1.7-1.9-.6-2.2-.8-4.5-1.6-6.4C3.9 11.7 3 10.2 3 7.8 3 4.7 4.9 2.5 7.5 2.5Z" />
+      </svg>
+    </span>
+  );
+}
+
+function Champ({
+  label,
+  value,
   onChange,
-  onDelete,
-  onAdd,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="text-sm">
+      <span className="mb-1 block text-slate-600">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-xl border border-slate-200 px-3 py-2 focus:border-cyan-500 focus:outline-none"
+      />
+    </label>
+  );
+}
+
+function Pastille({ ton, children }: { ton: "ecoute" | "calcul" | "pret" | "neutre"; children: React.ReactNode }) {
+  const styles = {
+    ecoute: "bg-red-50 text-red-700 ring-red-200",
+    calcul: "bg-cyan-50 text-cyan-800 ring-cyan-200",
+    pret: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    neutre: "bg-slate-100 text-slate-600 ring-slate-200",
+  }[ton];
+  const point = {
+    ecoute: "bg-red-500 animate-pulse",
+    calcul: "bg-cyan-500 animate-pulse",
+    pret: "bg-emerald-500",
+    neutre: "bg-slate-400",
+  }[ton];
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ${styles}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${point}`} />
+      {children}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+type Ecoute = ReturnType<typeof useEcoute>;
+
+function CarteEcoute({
+  ecoute,
+  texte,
+  simulation,
+  onDemarrer,
+  onTerminer,
+  onSimuler,
+}: {
+  ecoute: Ecoute;
+  texte: string;
+  simulation: string | null;
+  onDemarrer: () => void;
+  onTerminer: () => void;
+  onSimuler: (id: string) => void;
+}) {
+  const [maintenant, setMaintenant] = useState(0);
+  const [historique, setHistorique] = useState<number[]>(() => Array(32).fill(0));
+  const [reglages, setReglages] = useState(false);
+  const [cas, setCas] = useState(CAS_DEMO[0].id);
+  const zoneTexteRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ecoute.actif) return;
+    const id = setInterval(() => setMaintenant(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [ecoute.actif]);
+
+  useEffect(() => {
+    queueMicrotask(() => setHistorique((h) => [...h.slice(1), ecoute.niveau]));
+  }, [ecoute.niveau]);
+
+  useEffect(() => {
+    const zone = zoneTexteRef.current;
+    if (zone) zone.scrollTop = zone.scrollHeight;
+  }, [texte]);
+
+  const secondes = ecoute.debut && maintenant ? Math.max(0, Math.floor((maintenant - ecoute.debut) / 1000)) : 0;
+  const chrono = `${String(Math.floor(secondes / 60)).padStart(2, "0")}:${String(secondes % 60).padStart(2, "0")}`;
+  const enCours = ecoute.actif || simulation !== null;
+  const dictee = ecoute.mode === "dictee";
+
+  let titre: React.ReactNode = (
+    <>
+      Parlez normalement.
+      <br />
+      <span className="text-cyan-300">Le devis se remplit.</span>
+    </>
+  );
+  if (simulation)
+    titre = (
+      <>
+        Ça écoute,
+        <br />
+        <span className="text-cyan-300">ça code, ça chiffre.</span>
+      </>
+    );
+  else if (ecoute.actif && dictee)
+    titre = ecoute.enregistre ? (
+      <>
+        Je vous écoute.
+        <br />
+        <span className="text-cyan-300">Remettez la sourdine pour finir.</span>
+      </>
+    ) : (
+      <>
+        En veille.
+        <br />
+        <span className="text-cyan-300">Coupez la sourdine pour dicter.</span>
+      </>
+    );
+  else if (ecoute.actif)
+    titre = (
+      <>
+        Ça écoute,
+        <br />
+        <span className="text-cyan-300">ça code, ça chiffre.</span>
+      </>
+    );
+
+  return (
+    <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0b2a36] via-[#0d3442] to-[#0f4a58] p-6 text-white shadow-lg sm:p-8 lg:col-span-7">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+
+      <div className="relative flex items-center justify-between gap-3">
+        {enCours ? (
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium ring-1 ring-white/20">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
+            {simulation ? "Simulation" : ecoute.enregistre || !dictee ? "Écoute en cours" : "En veille"}
+            {ecoute.actif && <span className="tabular-nums text-white/60">{chrono}</span>}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/80 ring-1 ring-white/20">
+            <span className="h-2 w-2 rounded-full bg-cyan-300" />
+            Prêt
+          </span>
+        )}
+        {ecoute.enTranscription > 0 && <span className="text-xs text-white/60">Transcription…</span>}
+      </div>
+
+      <h1 className="relative mt-6 text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-4xl">{titre}</h1>
+
+      <div className="relative mt-6 flex h-12 items-end gap-1" aria-hidden>
+        {historique.map((v, i) => (
+          <span
+            key={i}
+            className={`flex-1 rounded-full transition-[height] duration-100 ${v > ecoute.seuil ? "bg-cyan-300" : "bg-white/20"}`}
+            style={{ height: `${Math.max(8, Math.min(100, (v / 0.08) * 100))}%` }}
+          />
+        ))}
+      </div>
+
+      <div
+        ref={zoneTexteRef}
+        className="relative mt-5 h-28 overflow-y-auto rounded-2xl bg-white/5 p-4 text-sm leading-relaxed text-white/85 ring-1 ring-white/10"
+      >
+        {texte ? <p>{texte}</p> : <p className="text-white/40">Le texte de la consultation s&apos;affichera ici au fil de l&apos;échange.</p>}
+      </div>
+
+      <div className="relative mt-6 flex flex-wrap items-center gap-3">
+        {ecoute.actif ? (
+          <button onClick={onTerminer} className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#0b2a36] shadow hover:bg-cyan-50">
+            Terminer la consultation
+          </button>
+        ) : (
+          <button
+            onClick={onDemarrer}
+            disabled={simulation !== null}
+            className="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-6 py-3 text-sm font-semibold text-[#0b2a36] shadow hover:bg-cyan-300 disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
+              <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />
+            </svg>
+            Démarrer la consultation
+          </button>
+        )}
+
+        {!enCours && (
+          <div className="flex rounded-full bg-white/10 p-1 text-xs ring-1 ring-white/15">
+            {(
+              [
+                ["consultation", "Consultation complète"],
+                ["dictee", "Dictée (sourdine)"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => ecoute.choisirMode(id)}
+                className={`rounded-full px-3 py-1.5 ${ecoute.mode === id ? "bg-white font-medium text-[#0b2a36]" : "text-white/75"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button onClick={() => setReglages((r) => !r)} className="text-xs text-white/60 underline-offset-2 hover:underline">
+          Micro et sensibilité
+        </button>
+      </div>
+
+      {!enCours && ecoute.mode === "consultation" && (
+        <p className="relative mt-3 text-xs text-white/55">
+          Prévenez le patient que l&apos;échange est écouté pour rédiger son compte rendu.
+        </p>
+      )}
+
+      {reglages && (
+        <div className="relative mt-4 grid gap-3 rounded-2xl bg-white/5 p-4 text-sm ring-1 ring-white/10">
+          {ecoute.micros.length > 0 && (
+            <label className="flex flex-wrap items-center gap-3 text-white/75">
+              Micro
+              <select
+                value={ecoute.micro}
+                onChange={(e) => ecoute.choisirMicro(e.target.value)}
+                disabled={ecoute.actif}
+                className="max-w-full flex-1 rounded-lg bg-white/10 px-2 py-1.5 text-white ring-1 ring-white/20 [&>option]:text-black"
+              >
+                <option value="">Micro par défaut</option>
+                {ecoute.micros.map((m, i) => (
+                  <option key={m.deviceId} value={m.deviceId}>
+                    {m.label || `Micro ${i + 1}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="flex items-center gap-3 text-white/75">
+            Sensibilité
+            <input
+              type="range"
+              min={0.003}
+              max={0.08}
+              step={0.001}
+              value={ecoute.seuil}
+              onChange={(e) => ecoute.regler(Number(e.target.value))}
+              className="flex-1 accent-cyan-300"
+              style={{ direction: "rtl" }}
+            />
+          </label>
+          <p className="text-xs text-white/50">
+            Les barres s&apos;allument en bleu quand la voix est détectée. Micro en sourdine, elles doivent rester grises.
+          </p>
+        </div>
+      )}
+
+      {!enCours && (
+        <div className="relative mt-6 flex flex-wrap items-center gap-2 border-t border-white/10 pt-4 text-xs text-white/60">
+          Pas de micro sous la main ?
+          <select
+            value={cas}
+            onChange={(e) => setCas(e.target.value)}
+            className="rounded-lg bg-white/10 px-2 py-1 text-white ring-1 ring-white/20 [&>option]:text-black"
+          >
+            {CAS_DEMO.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.titre}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => onSimuler(cas)}
+            className="rounded-full bg-white/10 px-3 py-1 font-medium text-white ring-1 ring-white/20 hover:bg-white/20"
+          >
+            Simuler la consultation
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function CarteDevis({
+  patient,
+  date,
+  ecouteActive,
+  chiffrage,
+  analyse,
   realises,
   proposes,
+  copie,
+  onImprimer,
+  onCopier,
+  identiteOuverte,
+  onIdentite,
+  children,
 }: {
-  actes: ActeExtrait[];
-  onChange: (i: number, modif: Partial<ActeExtrait>) => void;
-  onDelete: (i: number) => void;
-  onAdd: () => void;
+  patient: Patient;
+  date: string;
+  ecouteActive: boolean;
+  chiffrage: boolean;
+  analyse: Analyse | null;
   realises: LigneDevis[];
   proposes: LigneDevis[];
+  copie: boolean;
+  onImprimer: (doc: "cr" | "devis") => void;
+  onCopier: () => void;
+  identiteOuverte: boolean;
+  onIdentite: () => void;
+  children: React.ReactNode;
+}) {
+  const total = totaliser(proposes);
+  const dateFr = date ? new Date(`${date}T12:00:00`).toLocaleDateString("fr-FR") : "";
+  const vide = !analyse || (proposes.length === 0 && realises.length === 0 && analyse.actesNonReconnus.length === 0);
+
+  return (
+    <section className="flex flex-col rounded-3xl bg-white shadow-lg ring-1 ring-slate-200 lg:col-span-5">
+      <div className="flex items-start justify-between gap-3 px-5 pt-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <Logo />
+          <div className="min-w-0">
+            <p className="font-semibold leading-tight text-[#0b2a36]">Devis · Plan de traitement</p>
+            <button onClick={onIdentite} className="truncate text-left text-xs text-slate-500 hover:text-cyan-700">
+              {patient.nom || "Patient"} · consultation du {dateFr} {identiteOuverte ? "▴" : "▾"}
+            </button>
+          </div>
+        </div>
+        {chiffrage ? (
+          <Pastille ton="calcul">Chiffrage…</Pastille>
+        ) : ecouteActive ? (
+          <Pastille ton="ecoute">Écoute en cours</Pastille>
+        ) : analyse ? (
+          <Pastille ton="pret">Prêt</Pastille>
+        ) : (
+          <Pastille ton="neutre">En attente</Pastille>
+        )}
+      </div>
+
+      <div className="mt-3">{children}</div>
+
+      <div className="flex-1 px-5 pb-2 pt-3">
+        <div className="mb-1 grid grid-cols-[6.5rem_1fr] gap-3 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">
+          <span>Code CCAM</span>
+          <span>Acte</span>
+        </div>
+
+        {vide ? (
+          <div className="grid h-40 place-items-center rounded-2xl border border-dashed border-slate-200 px-6 text-center text-sm text-slate-400">
+            {chiffrage ? "Chiffrage en cours…" : "Les actes apparaîtront ici pendant que vous parlez."}
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {proposes.map((l, i) => (
+              <LigneActe key={`p-${l.acte.code}-${l.dents.join()}-${i}`} ligne={l} index={i} badge="chiffre" />
+            ))}
+            {analyse?.actesNonReconnus.map((n, i) => (
+              <li key={`n-${i}`} className="apparition grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 py-3">
+                <span className="rounded-lg bg-amber-50 px-2 py-1.5 text-center font-mono text-xs font-semibold text-amber-800">?</span>
+                <span className="text-sm text-slate-700">{n}</span>
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-amber-200">À coter</span>
+              </li>
+            ))}
+            {realises.length > 0 && (
+              <li className="pb-1 pt-4 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">Réalisé aujourd&apos;hui</li>
+            )}
+            {realises.map((l, i) => (
+              <LigneActe key={`r-${l.acte.code}-${l.dents.join()}-${i}`} ligne={l} index={proposes.length + i} badge="realise" />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {proposes.length > 0 && (
+        <div className="mx-5 mb-4 mt-2 flex items-end justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+          <div>
+            <p className="text-xs text-slate-500">Total du devis</p>
+            <p className="text-2xl font-extrabold tracking-tight text-[#0b2a36] tabular-nums">{euros(total.honoraires)}</p>
+          </div>
+          <div className="text-right text-xs text-slate-500">
+            <p>Remb. Sécu : {euros(total.remboursementAMO)}</p>
+            <p>Reste avant mutuelle : {euros(total.resteACharge)}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 border-t border-slate-100 px-5 py-4">
+        <button
+          onClick={() => onImprimer("devis")}
+          disabled={proposes.length === 0}
+          className="rounded-full bg-[#0b2a36] px-4 py-2 text-sm font-semibold text-white hover:bg-[#123f4f] disabled:opacity-40"
+        >
+          Imprimer le devis
+        </button>
+        <button
+          onClick={() => onImprimer("cr")}
+          disabled={!analyse}
+          className="rounded-full px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
+        >
+          Compte rendu
+        </button>
+        <button
+          onClick={onCopier}
+          disabled={!analyse}
+          className="rounded-full px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
+        >
+          {copie ? "Copié ✓" : "Copier le texte"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function LigneActe({ ligne, index, badge }: { ligne: LigneDevis; index: number; badge: "chiffre" | "realise" }) {
+  return (
+    <li className="apparition grid grid-cols-[6.5rem_1fr_auto] items-center gap-3 py-3" style={{ animationDelay: `${index * 120}ms` }}>
+      <span className="rounded-lg bg-cyan-50 px-2 py-1.5 text-center font-mono text-xs font-bold tracking-wide text-[#0e5566]">
+        {ligne.acte.code}
+      </span>
+      <span className="min-w-0">
+        <span className="line-clamp-2 text-sm font-semibold leading-snug text-[#0b2a36]">{ligne.acte.libelle}</span>
+        <span className="block text-xs text-slate-500">
+          {ligne.dents.length ? `Dent ${ligne.dents.join(", ")} · ` : ligne.quantite > 1 ? `×${ligne.quantite} · ` : ""}
+          {euros(ligne.honoraires)}
+        </span>
+      </span>
+      {badge === "chiffre" ? (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.7-9.3a1 1 0 0 0-1.4-1.4L9 10.6 7.7 9.3a1 1 0 0 0-1.4 1.4l2 2a1 1 0 0 0 1.4 0l4-4Z"
+            />
+          </svg>
+          Chiffré
+        </span>
+      ) : (
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Réalisé</span>
+      )}
+    </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function OngletTexte({
+  texte,
+  occupe,
+  chiffrage,
+  onChange,
+  onChiffrer,
+}: {
+  texte: string;
+  occupe: boolean;
+  chiffrage: boolean;
+  onChange: (v: string) => void;
+  onChiffrer: () => void;
 }) {
   return (
     <div className="text-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse">
-          <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="py-2 pr-2 font-medium" title="Numéro d'étape du traitement">Étape</th>
-              <th className="py-2 pr-2 font-medium">Acte</th>
-              <th className="py-2 pr-2 font-medium">Dents</th>
-              <th className="py-2 pr-2 font-medium">Statut</th>
-              <th className="py-2 pr-2 font-medium">Précision</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {actes.map((a, i) => (
-              <tr key={i} className="border-b border-slate-100 align-top">
-                <td className="py-2 pr-2">
-                  <input
-                    type="number"
-                    min={1}
-                    value={a.etape}
-                    onChange={(e) => onChange(i, { etape: Math.max(1, Number(e.target.value) || 1) })}
-                    className="w-14 rounded border border-slate-300 px-2 py-1"
-                    aria-label="Étape"
-                  />
-                </td>
-                <td className="py-2 pr-2">
-                  <select value={a.code} onChange={(e) => onChange(i, { code: e.target.value })} className="w-full max-w-xs rounded border border-slate-300 px-2 py-1">
-                    {TARIFS.map((t) => (
-                      <option key={t.code} value={t.code}>
-                        {t.code} · {t.libelle}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-2 pr-2">
-                  <input
-                    value={a.dents.join(", ")}
-                    onChange={(e) =>
-                      onChange(i, { dents: e.target.value.split(/[,\s]+/).filter(Boolean) })
-                    }
-                    placeholder="ex. 36, 37"
-                    className="w-24 rounded border border-slate-300 px-2 py-1"
-                  />
-                </td>
-                <td className="py-2 pr-2">
-                  <select value={a.statut} onChange={(e) => onChange(i, { statut: e.target.value as ActeExtrait["statut"] })} className="rounded border border-slate-300 px-2 py-1">
-                    <option value="realise">Réalisé</option>
-                    <option value="propose">Proposé (devis)</option>
-                  </select>
-                </td>
-                <td className="py-2 pr-2">
-                  <input value={a.precision} onChange={(e) => onChange(i, { precision: e.target.value })} className="w-full rounded border border-slate-300 px-2 py-1" />
-                </td>
-                <td className="py-2">
-                  <button onClick={() => onDelete(i)} className="rounded px-2 py-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Supprimer l'acte">
-                    ✕
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <button onClick={onAdd} className="mt-3 text-teal-700 hover:underline">
-        + Ajouter un acte
-      </button>
-
-      <h3 className="mb-2 mt-6 font-medium">Devis (actes proposés)</h3>
-      <TableauMontants lignes={proposes} />
-      {realises.length > 0 && (
-        <>
-          <h3 className="mb-2 mt-6 font-medium">Actes réalisés pendant la séance</h3>
-          <TableauMontants lignes={realises} />
-        </>
-      )}
-    </div>
-  );
-}
-
-function TableauMontants({ lignes }: { lignes: LigneDevis[] }) {
-  if (lignes.length === 0) return <p className="text-slate-500">Aucun acte.</p>;
-  const t = totaliser(lignes);
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-[0.95em]">
-        <thead>
-          <tr className="border-b border-slate-300 text-left">
-            <th className="py-1.5 pr-2 font-medium">Code</th>
-            <th className="py-1.5 pr-2 font-medium">Acte</th>
-            <th className="py-1.5 pr-2 font-medium">Dents</th>
-            <th className="py-1.5 pr-2 font-medium">Panier</th>
-            <th className="py-1.5 pr-2 text-right font-medium">Honoraires</th>
-            <th className="py-1.5 pr-2 text-right font-medium">Base remb.</th>
-            <th className="py-1.5 pr-2 text-right font-medium">Remb. AMO</th>
-            <th className="py-1.5 text-right font-medium">Reste*</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lignes.map((l, i) => (
-            <tr key={i} className="border-b border-slate-100">
-              <td className="py-1.5 pr-2 font-mono text-xs">{l.acte.code}</td>
-              <td className="py-1.5 pr-2">
-                {l.acte.libelle}
-                {l.precision && <span className="block text-xs text-slate-500">{l.precision}</span>}
-              </td>
-              <td className="py-1.5 pr-2">{l.dents.join(", ") || (l.quantite > 1 ? `×${l.quantite}` : "")}</td>
-              <td className="py-1.5 pr-2">{l.acte.panier}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums">{euros(l.honoraires)}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums">{euros(l.baseRemboursement)}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums">{euros(l.remboursementAMO)}</td>
-              <td className="py-1.5 text-right tabular-nums">{euros(l.resteACharge)}</td>
-            </tr>
+      <textarea
+        value={texte}
+        onChange={(e) => onChange(e.target.value)}
+        rows={8}
+        disabled={occupe}
+        placeholder="La transcription de la consultation apparaît ici. Vous pouvez aussi taper, coller ou corriger le texte, puis le chiffrer."
+        className="w-full rounded-xl border border-slate-200 px-3 py-2 leading-relaxed focus:border-cyan-500 focus:outline-none disabled:bg-slate-50"
+      />
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          onClick={onChiffrer}
+          disabled={occupe || chiffrage || !texte.trim()}
+          className="rounded-full bg-[#0b2a36] px-4 py-2 font-semibold text-white hover:bg-[#123f4f] disabled:opacity-40"
+        >
+          {chiffrage ? "Chiffrage…" : "Chiffrer ce texte"}
+        </button>
+        <select
+          value=""
+          onChange={(e) => {
+            const cas = CAS_DEMO.find((c) => c.id === e.target.value);
+            if (cas) onChange(cas.dictee);
+          }}
+          disabled={occupe}
+          className="rounded-full border border-slate-200 px-3 py-2 text-slate-600"
+        >
+          <option value="">Charger un texte d&apos;exemple…</option>
+          {CAS_DEMO.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.titre}
+            </option>
           ))}
-        </tbody>
-        <tfoot>
-          <tr className="font-semibold">
-            <td colSpan={4} className="py-2 pr-2">
-              Total
-            </td>
-            <td className="py-2 pr-2 text-right tabular-nums">{euros(t.honoraires)}</td>
-            <td className="py-2 pr-2 text-right tabular-nums">{euros(t.baseRemboursement)}</td>
-            <td className="py-2 pr-2 text-right tabular-nums">{euros(t.remboursementAMO)}</td>
-            <td className="py-2 text-right tabular-nums">{euros(t.resteACharge)}</td>
-          </tr>
-        </tfoot>
-      </table>
-      <p className="mt-1 text-xs text-slate-500">
-        * Reste à charge avant remboursement de la complémentaire santé.
-      </p>
-    </div>
-  );
-}
-
-function EnTete({ cabinet, patient, date, titre }: { cabinet: Cabinet; patient: string; date: string; titre: string }) {
-  const dateFr = date ? new Date(`${date}T12:00:00`).toLocaleDateString("fr-FR") : "";
-  return (
-    <div className="mb-6">
-      <div className="flex justify-between border-b border-black pb-3">
-        <div>
-          <p className="font-semibold">{cabinet.praticien || "Praticien"}</p>
-          <p>Chirurgien-dentiste</p>
-          {cabinet.adresse && <p>{cabinet.adresse}</p>}
-          {cabinet.telephone && <p>Tél. {cabinet.telephone}</p>}
-          {cabinet.rpps && <p>RPPS {cabinet.rpps}</p>}
-        </div>
-        <div className="text-right">
-          <p>Le {dateFr}</p>
-          {patient && <p className="mt-2">Patient : {patient}</p>}
-        </div>
-      </div>
-      <h1 className="mt-5 text-center text-lg font-semibold">{titre}</h1>
-    </div>
-  );
-}
-
-function CompteRenduImprimable({ analyse, realises }: { analyse: Analyse; realises: LigneDevis[] }) {
-  return (
-    <div className="space-y-3">
-      {RUBRIQUES.map((r) => (
-        <div key={r.cle} className="break-inside-avoid">
-          <h2 className="font-semibold">{r.titre}</h2>
-          <p className="whitespace-pre-wrap">{analyse.compteRendu[r.cle]}</p>
-        </div>
-      ))}
-      {realises.length > 0 && (
-        <div className="break-inside-avoid">
-          <h2 className="font-semibold">Actes réalisés</h2>
-          <ul className="list-disc pl-5">
-            {realises.map((l, i) => (
-              <li key={i}>
-                {l.acte.code} · {l.acte.libelle}
-                {l.dents.length > 0 && ` (dent ${l.dents.join(", ")})`}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const montant = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dateFr = (iso: string) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR") : "");
-
-/** Devis au format du modèle conventionnel utilisé par le cabinet. */
-function DevisConventionnel({
-  lignes,
-  cabinet,
-  patient,
-  date,
-  numero,
-}: {
-  lignes: LigneDevis[];
-  cabinet: Cabinet;
-  patient: Patient;
-  date: string;
-  numero: string;
-}) {
-  const t = totaliser(lignes);
-  const th = "border border-black px-1 py-0.5 text-center align-middle font-normal";
-  const td = "border border-black px-1 py-0.5";
-  const num = `${td} text-right tabular-nums`;
-  return (
-    <div className="page-devis text-[8.5pt] leading-tight">
-      <div className="mb-2 flex items-start justify-between gap-4">
-        <div className="flex-1 border border-black px-2 py-1 text-center">
-          <p className="font-semibold">
-            DEVIS POUR LES TRAITEMENTS ET ACTES BUCCO-DENTAIRES FAISANT L&apos;OBJET D&apos;UNE ENTENTE DIRECTE
-          </p>
-          <p>conformément aux dispositions de la convention nationale des chirurgiens-dentistes</p>
-        </div>
-        <div className="text-right">
-          <p>Devis {numero}</p>
-          <p>Établi le {dateFr(date)}</p>
-        </div>
-      </div>
-
-      <div className="mb-3 grid grid-cols-2 border border-black">
-        <div className="border-r border-black px-2 py-1">
-          <p className="font-semibold">Identification du chirurgien-dentiste traitant</p>
-          <p>Docteur {cabinet.praticien}</p>
-          <p>
-            Identifiant du praticien : N° RPPS : {cabinet.rpps} - N° de l&apos;établissement (FINESS) : {cabinet.finess}
-          </p>
-          {cabinet.adresse && <p>{cabinet.adresse}</p>}
-        </div>
-        <div className="px-2 py-1">
-          <p className="font-semibold">Identification du patient</p>
-          <p>Nom et prénom : {patient.nom}</p>
-          <p>Date de naissance : {dateFr(patient.naissance)}</p>
-          <p>N° de sécurité sociale du patient : {patient.secu}</p>
-        </div>
-      </div>
-
-      <table className="w-full border-collapse">
-        <thead>
-          <tr>
-            <th colSpan={11} className={`${td} text-left`}>
-              <span className="text-[10pt] font-semibold">Traitement proposé</span> – Description précise et détaillée des
-              actes
-            </th>
-          </tr>
-          <tr>
-            <th className={th}>N° de traitement</th>
-            <th className={th}>N° dent ou localisation</th>
-            <th className={th}>Cotation CCAM, NGAP ou acte HN</th>
-            <th className={`${th} w-[28%]`}>Nature de l&apos;acte</th>
-            <th className={th}>Matériaux utilisés</th>
-            <th className={th}>Panier</th>
-            <th className={th}>Honoraires limite de facturation</th>
-            <th className={th}>Base de remboursement de l&apos;Assurance Maladie Obligatoire</th>
-            <th className={th}>Montant remboursé Assurance Maladie Obligatoire</th>
-            <th className={th}>Montant non remboursé Assurance Maladie Obligatoire</th>
-            <th className={th}>Honoraires dt prix de vente du dispositif médical sur mesure</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lignes.map((l, i) => {
-            const remboursable = l.acte.tauxAMO > 0;
-            return (
-              <tr key={i}>
-                <td className={`${td} text-center`}>{l.etape}</td>
-                <td className={`${td} text-center`}>{l.dents.join(", ") || (l.quantite > 1 ? `×${l.quantite}` : "")}</td>
-                <td className={td}>{l.acte.code}</td>
-                <td className={td}>
-                  {l.acte.libelle}
-                  {l.precision && <span className="block italic">{l.precision}</span>}
-                </td>
-                <td className={`${td} text-center`}>{l.acte.materiau ?? ""}</td>
-                <td className={`${td} text-center`}>{numeroPanier(l.acte.panier)}</td>
-                <td className={num}>{l.acte.limite !== undefined ? montant(l.acte.limite * l.quantite) : ""}</td>
-                <td className={num}>{remboursable ? montant(l.baseRemboursement) : "NR"}</td>
-                <td className={num}>{montant(l.remboursementAMO)}</td>
-                <td className={num}>{montant(l.resteACharge)}</td>
-                <td className={num}>{montant(l.honoraires)}</td>
-              </tr>
-            );
-          })}
-          <tr className="font-semibold">
-            <td colSpan={7} className={`${td} text-right`}>
-              TOTAL € (des actes envisagés)
-            </td>
-            <td className={num}>{montant(t.baseRemboursement)}</td>
-            <td className={num}>{montant(t.remboursementAMO)}</td>
-            <td className={num}>{montant(t.resteACharge)}</td>
-            <td className={num}>{montant(t.honoraires)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <p className="mt-1">
-        Panier : 1 = 100 % santé (sans reste à charge), 2 = tarifs maîtrisés, 3 = tarifs libres. NR = non remboursable.
-        Devis valable 6 mois.
-      </p>
-
-      <div className="mt-3 grid grid-cols-2 gap-4">
-        <div className="h-28 border border-black px-2 py-1">
-          <p>Le patient ou son représentant légal reconnaît avoir eu la possibilité du choix de son traitement.</p>
-          <p>Date et signature du patient ou du (ou des) responsable(s) légal (légaux)</p>
-        </div>
-        <div className="h-28 border border-black px-2 py-1">
-          <p>Signature du chirurgien-dentiste</p>
-        </div>
+        </select>
       </div>
     </div>
   );
