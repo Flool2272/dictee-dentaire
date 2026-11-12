@@ -8,15 +8,15 @@ import type { ActeExtrait, Analyse } from "@/lib/schema";
 import { TARIFS } from "@/lib/tarifs";
 import { CAS_DEMO } from "@/lib/demo";
 import { calculerLignes, euros, totaliser, type LigneDevis } from "@/lib/devis";
-import { CABINET_VIDE, RUBRIQUES, type Cabinet, type Patient } from "@/lib/types";
+import { CABINET_DEFAUT, completerCabinet, RUBRIQUES, type Cabinet, type Patient } from "@/lib/types";
 import { useEcoute } from "@/lib/useEcoute";
 
 function lireCabinet(): Cabinet {
   try {
     const brut = localStorage.getItem("cabinet");
-    return brut ? { ...CABINET_VIDE, ...JSON.parse(brut) } : CABINET_VIDE;
+    return completerCabinet(brut ? JSON.parse(brut) : {});
   } catch {
-    return CABINET_VIDE;
+    return CABINET_DEFAUT;
   }
 }
 
@@ -24,7 +24,7 @@ const joindre = (avant: string, ajout: string) => (avant ? `${avant} ${ajout}` :
 
 export default function Accueil() {
   const router = useRouter();
-  const [cabinet, setCabinet] = useState<Cabinet>(CABINET_VIDE);
+  const [cabinet, setCabinet] = useState<Cabinet>(CABINET_DEFAUT);
   const [reglagesOuverts, setReglagesOuverts] = useState(false);
   const [patient, setPatient] = useState<Patient>({ nom: "", naissance: "", secu: "" });
   const [identiteOuverte, setIdentiteOuverte] = useState(false);
