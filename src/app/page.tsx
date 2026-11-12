@@ -371,8 +371,8 @@ export default function Accueil() {
           </CarteDevis>
         </div>
 
-        {(erreur || ecoute.erreur) && (
-          <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{erreur ?? ecoute.erreur}</p>
+        {erreur && (
+          <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{erreur}</p>
         )}
 
         <section className="mt-5 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
@@ -710,6 +710,12 @@ function CarteEcoute({
           Micro et sensibilité
         </button>
       </div>
+
+      {ecoute.erreur && (
+        <p role="alert" className="relative mt-4 rounded-xl bg-red-500/15 px-4 py-3 text-sm text-red-100 ring-1 ring-red-400/40">
+          {ecoute.erreur}
+        </p>
+      )}
 
       {!enCours && ecoute.mode === "consultation" && (
         <p className="relative mt-3 text-xs text-white/55">

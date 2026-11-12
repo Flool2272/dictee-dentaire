@@ -139,6 +139,16 @@ export function useEcoute(onTexte: (texte: string) => void) {
 
   async function demarrer() {
     setErreur(null);
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined" || typeof AudioContext === "undefined") {
+      setErreur(
+        "Ce navigateur ne permet pas d'utiliser le micro. Ouvrez le site directement dans Safari ou Chrome (pas depuis l'aperçu d'une messagerie), et vérifiez que le téléphone est à jour."
+      );
+      return;
+    }
+    // Safari (iPhone) n'autorise le traitement du son que s'il démarre au moment même du toucher :
+    // on crée donc le contexte audio AVANT d'attendre l'autorisation du micro.
+    const ctx = new AudioContext();
+    ctx.resume().catch(() => {});
     let flux: MediaStream;
     try {
       flux = await navigator.mediaDevices.getUserMedia({
@@ -150,14 +160,14 @@ export function useEcoute(onTexte: (texte: string) => void) {
         },
       });
     } catch (e) {
+      ctx.close().catch(() => {});
       setErreur(messageErreurMicro(e));
       return;
     }
     listerMicros();
     fluxRef.current = flux;
-
-    const ctx = new AudioContext();
     ctxRef.current = ctx;
+    if (ctx.state === "suspended") await ctx.resume().catch(() => {});
     const analyseur = ctx.createAnalyser();
     analyseur.fftSize = 2048;
     ctx.createMediaStreamSource(flux).connect(analyseur);
@@ -199,7 +209,15 @@ export function useEcoute(onTexte: (texte: string) => void) {
         debutSegment = derniereVoix = maintenant;
         tempsVoix = 0;
         setEnregistre(true);
-        const recorder = new MediaRecorder(flux);
+        let recorder: MediaRecorder;
+        try {
+          recorder = new MediaRecorder(flux);
+        } catch {
+          setErreur("L'enregistrement n'a pas pu démarrer sur ce navigateur. Essayez avec Safari ou Chrome à jour.");
+          segmentEnCours = false;
+          setEnregistre(false);
+          return;
+        }
         const morceaux: Blob[] = [];
         recorder.ondataavailable = (e) => {
           if (e.data.size > 0) morceaux.push(e.data);
