@@ -123,7 +123,15 @@ export default function Accueil() {
     setDemo(null);
     setErreur(null);
     setNumeroDevis("");
+  }
+
+  // L'identité saisie avant la consultation est conservée ; elle n'est effacée
+  // qu'avec « Nouveau patient », pour éviter qu'un nom passe sur le devis suivant.
+  function nouveauPatient() {
+    if (ecoute.actif || simulation) return;
+    nouvelleConsultation();
     setPatient({ nom: "", naissance: "", secu: "" });
+    setIdentiteOuverte(false);
   }
 
   async function demarrer() {
@@ -280,6 +288,7 @@ export default function Accueil() {
             copie={copie}
             onImprimer={imprimer}
             onCopier={copier}
+            onNouveauPatient={nouveauPatient}
             identiteOuverte={identiteOuverte}
             onIdentite={() => setIdentiteOuverte((o) => !o)}
           >
@@ -721,6 +730,7 @@ function CarteDevis({
   copie,
   onImprimer,
   onCopier,
+  onNouveauPatient,
   identiteOuverte,
   onIdentite,
   children,
@@ -735,6 +745,7 @@ function CarteDevis({
   copie: boolean;
   onImprimer: (doc: "cr" | "devis") => void;
   onCopier: () => void;
+  onNouveauPatient: () => void;
   identiteOuverte: boolean;
   onIdentite: () => void;
   children: React.ReactNode;
@@ -852,6 +863,14 @@ function CarteDevis({
         >
           {copie ? "Copié ✓" : "Copier le texte"}
         </button>
+        {(analyse || patient.nom) && !ecouteActive && (
+          <button
+            onClick={onNouveauPatient}
+            className="ml-auto rounded-xl px-3 py-2 text-sm font-medium text-[#4655d8] hover:bg-[#ecedfe]"
+          >
+            Nouveau patient
+          </button>
+        )}
       </div>
     </section>
   );
