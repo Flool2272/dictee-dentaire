@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import EditeurActes from "@/components/EditeurActes";
+import Historique from "@/components/Historique";
 import { CompteRenduImprimable, DevisConventionnel, EnTete } from "@/components/Documents";
 import type { ActeExtrait, Analyse } from "@/lib/schema";
 import { TARIFS } from "@/lib/tarifs";
@@ -10,6 +11,7 @@ import { CAS_DEMO } from "@/lib/demo";
 import { calculerLignes, euros, totaliser, type LigneDevis } from "@/lib/devis";
 import { CABINET_DEFAUT, completerCabinet, RUBRIQUES, type Cabinet, type Patient } from "@/lib/types";
 import { useEcoute } from "@/lib/useEcoute";
+import { enregistrer, lireHistorique, supprimer, toutEffacer, type EntreeHistorique } from "@/lib/historique";
 
 function lireCabinet(): Cabinet {
   try {
@@ -38,12 +40,19 @@ export default function Accueil() {
   const [aImprimer, setAImprimer] = useState<"cr" | "devis">("devis");
   const [copie, setCopie] = useState(false);
   const [numeroDevis, setNumeroDevis] = useState("");
+  const [historique, setHistorique] = useState<EntreeHistorique[]>([]);
+  const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
+  const [enregistre, setEnregistre] = useState(false);
   const [simulation, setSimulation] = useState<string | null>(null);
 
   useEffect(() => {
     // Lecture différée : localStorage n'existe pas pendant le rendu serveur.
     const c = lireCabinet();
-    queueMicrotask(() => setCabinet(c));
+    const h = lireHistorique();
+    queueMicrotask(() => {
+      setCabinet(c);
+      setHistorique(h);
+    });
   }, []);
 
   function majCabinet(c: Cabinet) {
@@ -202,7 +211,43 @@ export default function Accueil() {
     setAnalyse({ ...analyse, actes: [...analyse.actes, nouvel] });
   }
 
+  // ----- Historique (navigateur de cet ordinateur uniquement) -----
+
+  function sauvegarder(imprime: boolean) {
+    if (!analyse || !numeroDevis) return;
+    setHistorique(
+      enregistrer({
+        numero: numeroDevis,
+        date,
+        enregistreLe: new Date().toISOString(),
+        patient,
+        analyse,
+        totalDevis: totaliser(proposes).honoraires,
+        nbActes: proposes.length,
+        imprime,
+      })
+    );
+    setEnregistre(true);
+    setTimeout(() => setEnregistre(false), 2000);
+  }
+
+  function ouvrirDepuisHistorique(e: EntreeHistorique) {
+    if (occupe) return;
+    texteRef.current = "";
+    setTexte("");
+    setDemo(null);
+    setErreur(null);
+    setAnalyse(e.analyse);
+    setPatient(e.patient);
+    setDate(e.date);
+    setNumeroDevis(e.numero);
+    setHistoriqueOuvert(false);
+    setOnglet("cr");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function imprimer(doc: "cr" | "devis") {
+    if (doc === "devis") sauvegarder(true);
     setAImprimer(doc);
     setTimeout(() => window.print(), 50);
   }
@@ -241,6 +286,13 @@ export default function Accueil() {
             <span className="flex flex-col leading-none"><span className="font-display text-xl font-extrabold tracking-tight text-[#1b2340]">Émail</span><span className="mt-1 hidden text-xs text-slate-500 sm:block">Dictée et devis dentaires</span></span>
           </div>
           <nav className="flex gap-1 text-sm">
+            <button
+              onClick={() => setHistoriqueOuvert((o) => !o)}
+              aria-expanded={historiqueOuvert}
+              className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-white"
+            >
+              Historique{historique.length > 0 && <span className="ml-1.5 rounded-md bg-[#ecedfe] px-1.5 py-0.5 text-xs text-[#2f3aa6]">{historique.length}</span>}
+            </button>
             <button onClick={() => setReglagesOuverts((o) => !o)} className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-white">
               Cabinet
             </button>
@@ -249,6 +301,17 @@ export default function Accueil() {
             </button>
           </nav>
         </header>
+
+        {historiqueOuvert && (
+          <Historique
+            entrees={historique}
+            numeroCourant={numeroDevis}
+            onOuvrir={ouvrirDepuisHistorique}
+            onSupprimer={(n) => setHistorique(supprimer(n))}
+            onToutEffacer={() => setHistorique(toutEffacer())}
+            onFermer={() => setHistoriqueOuvert(false)}
+          />
+        )}
 
         {reglagesOuverts && (
           <section className="mb-6 grid gap-3 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:grid-cols-2">
@@ -289,6 +352,8 @@ export default function Accueil() {
             onImprimer={imprimer}
             onCopier={copier}
             onNouveauPatient={nouveauPatient}
+            onEnregistrer={() => sauvegarder(false)}
+            enregistre={enregistre}
             identiteOuverte={identiteOuverte}
             onIdentite={() => setIdentiteOuverte((o) => !o)}
           >
@@ -731,6 +796,8 @@ function CarteDevis({
   onImprimer,
   onCopier,
   onNouveauPatient,
+  onEnregistrer,
+  enregistre,
   identiteOuverte,
   onIdentite,
   children,
@@ -746,6 +813,8 @@ function CarteDevis({
   onImprimer: (doc: "cr" | "devis") => void;
   onCopier: () => void;
   onNouveauPatient: () => void;
+  onEnregistrer: () => void;
+  enregistre: boolean;
   identiteOuverte: boolean;
   onIdentite: () => void;
   children: React.ReactNode;
@@ -862,6 +931,13 @@ function CarteDevis({
           className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
         >
           {copie ? "Copié ✓" : "Copier le texte"}
+        </button>
+        <button
+          onClick={onEnregistrer}
+          disabled={!analyse || ecouteActive}
+          className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-40"
+        >
+          {enregistre ? "Enregistré ✓" : "Enregistrer"}
         </button>
         {(analyse || patient.nom) && !ecouteActive && (
           <button

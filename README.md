@@ -17,6 +17,12 @@ Prototype : la praticienne dicte, l'application rédige le compte rendu de consu
 Sans `ANTHROPIC_API_KEY`, l'analyse renvoie un résultat fictif (celui de la dictée d'exemple) pour tester
 l'interface, le devis et les PDF. Sans `OPENAI_API_KEY`, la dictée vocale est désactivée : il faut taper le texte.
 
+## Historique des devis
+
+Les devis enregistrés ou imprimés sont conservés dans le navigateur de l'ordinateur utilisé
+(`src/lib/historique.ts`, localStorage), jamais sur le serveur. On peut les rechercher, les rouvrir,
+les supprimer et les exporter en CSV. Ils contiennent des données de santé : ils restent sur ce poste.
+
 ## Grille tarifaire
 
 `src/lib/tarifs.ts` contient huit actes repris d'un devis réel du cabinet ; les autres sont **simulés** et doivent être remplacés par les codes CCAM, honoraires
