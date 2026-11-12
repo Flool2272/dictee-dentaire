@@ -284,7 +284,7 @@ export default function Accueil() {
             onIdentite={() => setIdentiteOuverte((o) => !o)}
           >
             {identiteOuverte && (
-              <div className="grid gap-3 border-t border-slate-100 px-5 py-4 sm:grid-cols-2">
+              <div className="grid gap-3 px-5 py-4 sm:grid-cols-2">
                 <Champ label="Nom et prénom" value={patient.nom} onChange={(v) => setPatient({ ...patient, nom: v })} />
                 <Champ label="N° de sécurité sociale" value={patient.secu} onChange={(v) => setPatient({ ...patient, secu: v })} />
                 <Champ label="Date de naissance" type="date" value={patient.naissance} onChange={(v) => setPatient({ ...patient, naissance: v })} />
@@ -750,9 +750,7 @@ function CarteDevis({
           <Logo />
           <div className="min-w-0">
             <p className="font-semibold leading-tight text-[#1b2340]">Devis · Plan de traitement</p>
-            <button onClick={onIdentite} className="truncate text-left text-xs text-slate-500 hover:text-[#4655d8]">
-              {patient.nom || "Patient"} · consultation du {dateFr} {identiteOuverte ? "▴" : "▾"}
-            </button>
+            <p className="text-xs text-slate-500">Consultation du {dateFr}</p>
           </div>
         </div>
         {chiffrage ? (
@@ -766,7 +764,26 @@ function CarteDevis({
         )}
       </div>
 
-      <div className="mt-3">{children}</div>
+      <div className="mx-5 mt-4">
+        <button
+          onClick={onIdentite}
+          aria-expanded={identiteOuverte}
+          className={`flex w-full items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-left text-sm ring-1 ${
+            patient.nom
+              ? "bg-slate-50 text-[#1b2340] ring-slate-200 hover:bg-slate-100"
+              : "bg-[#ecedfe] font-medium text-[#2f3aa6] ring-[#d5d9fb] hover:bg-[#e2e5fd]"
+          }`}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="currentColor" aria-hidden="true">
+              <path d="M10 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0H3Z" />
+            </svg>
+            <span className="truncate">{patient.nom ? `Patient : ${patient.nom}` : "Ajouter l'identité du patient"}</span>
+          </span>
+          <span className="shrink-0 text-xs text-slate-500">{identiteOuverte ? "Fermer" : patient.nom ? "Modifier" : "Pour l'impression"}</span>
+        </button>
+      </div>
+      <div className="mt-1">{children}</div>
 
       <div className="flex-1 px-5 pb-2 pt-3">
         <div className="mb-1 grid grid-cols-[6.5rem_1fr] gap-3 text-[0.65rem] font-semibold uppercase tracking-wider text-slate-400">
